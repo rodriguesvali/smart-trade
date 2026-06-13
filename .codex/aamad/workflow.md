@@ -36,7 +36,7 @@ The default backend runtime is `native-python`, not a chat-oriented multi-agent 
 
 Do not introduce CrewAI, Next.js, assistant-ui, chat endpoints, margin trading, futures, leverage, short selling, pyramiding, martingale, or position scaling unless the Agentic Architect explicitly changes scope.
 
-The smallest valid next Define step is to review and approve this bootstrap alignment, then decide whether to copy `docs/proposed-solution.md` into `project-context/1.define/product-requirements-document.md` as the approved PRD or revise it first.
+The smallest valid next Define step is to review and approve this bootstrap alignment, then decide whether to copy `docs/proposed-solution.md` into `project-context/1.define/prd.md` as the approved PRD or revise it first.
 
 ## Role Refinement
 

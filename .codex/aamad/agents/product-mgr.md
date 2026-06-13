@@ -12,7 +12,7 @@ agent:
     - "Hands off approved PRD scope and summary to architect and build team"
     - "Iterates with research persona to update requirements as needed"
     - "Approves handoff for technical and build teams"
-  outputs: ["project-context/1.define/product-requirements-document.md", "project-context/1.define/context-summary.md", "handoff checklist"]
+  outputs: ["project-context/1.define/prd.md", "project-context/1.define/context-summary.md", "handoff checklist"]
 ---
 
 # Product Manager Agent Persona

@@ -17,7 +17,7 @@ actions:
   - log-defects
   - future-work
 inputs:
-  - project-context/1.define/product-requirements-document.md
+  - project-context/1.define/prd.md
   - project-context/1.define/sad.md
   - project-context/2.build/frontend.md
   - project-context/2.build/backend.md

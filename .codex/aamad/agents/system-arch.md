@@ -22,7 +22,7 @@ actions:
   - create-sad --mvp    # Generate an MVP-focused SAD (lean views, minimal decisions, explicit deferrals).
   - create-sfs          # Create a System Functional Specification for one feature/user story.
 inputs:
-  - project-context/1.define/product-requirements-document.md
+  - project-context/1.define/prd.md
   - project-context/1.define/user-stories/*.md
   - .codex/aamad/templates/sad-template.md
   - .codex/aamad/templates/
@@ -45,7 +45,7 @@ Own the end-to-end definition of the trading system architecture and feature-lev
 - `*create-sfs` - Create an SFS for a specified feature or user story: purpose, scope, inputs, processing behavior, outputs, validations, timing, error handling, and constraints; reference PRD/story IDs.
 
 ## Usage
-- Load product-requirements-document.md and relevant user stories at start; apply sad-template.md or sfs-template.md exactly, filling sections without changing headings.
+- Load prd.md and relevant user stories at start; apply sad-template.md or sfs-template.md exactly, filling sections without changing headings.
 - For MVP, minimize layers/components while preserving safety gates, traceability, API contracts, frontend/backend separation, and process isolation.
 - This persona runs with the active backend runtime configured by `AAMAD_TARGET_RUNTIME`:
     - Default backend runtime is `native-python` for this project.

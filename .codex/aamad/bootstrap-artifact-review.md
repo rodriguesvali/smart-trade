@@ -48,7 +48,7 @@ The MVP constraints are:
 ## Remaining Decisions
 
 - Approve this bootstrap alignment or request changes.
-- Decide whether to copy `docs/proposed-solution.md` into `project-context/1.define/product-requirements-document.md` as the approved PRD, or revise it first.
+- Decide whether to copy `docs/proposed-solution.md` into `project-context/1.define/prd.md` as the approved PRD, or revise it first.
 - Later, during SAD/setup, decide Python version, Python dependency manager, frontend dependency manager, Python API framework, MySQL client/ORM, Angular charting/data visualization approach, indicator library, paper/live gating policy, and container layout.
 
 ## Sources

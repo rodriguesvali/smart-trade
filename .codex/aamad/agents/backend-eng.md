@@ -25,7 +25,7 @@ actions:
   - verify-backend-operational-flow
   - document-backend
 inputs:
-  - project-context/1.define/product-requirements-document.md
+  - project-context/1.define/prd.md
   - project-context/1.define/sad.md
   - project-context/2.build/setup.md
   - .codex/aamad/rules/adapter-native-python.md
