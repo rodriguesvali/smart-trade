@@ -49,7 +49,7 @@ The MVP constraints are:
 
 - Approve this bootstrap alignment or request changes.
 - Decide whether to copy `docs/proposed-solution.md` into `project-context/1.define/product-requirements-document.md` as the approved PRD, or revise it first.
-- Later, during SAD/setup, decide Python version, Python dependency manager, frontend dependency manager, Python API framework, database, Angular charting/data visualization approach, indicator library, paper/live gating policy, and container layout.
+- Later, during SAD/setup, decide Python version, Python dependency manager, frontend dependency manager, Python API framework, MySQL client/ORM, Angular charting/data visualization approach, indicator library, paper/live gating policy, and container layout.
 
 ## Sources
 
@@ -69,7 +69,7 @@ The MVP constraints are:
 
 - Should `docs/proposed-solution.md` be accepted as-is as the approved PRD?
 - Which Angular charting/data visualization library should be used with PrimeNG?
-- Should the MVP database start with SQLite or PostgreSQL?
+- Which MySQL client/ORM stack should be used with Alembic?
 - Should TA-Lib or pandas-ta be preferred for the first implementation?
 - Should paper mode be mandatory before any live operation?
 

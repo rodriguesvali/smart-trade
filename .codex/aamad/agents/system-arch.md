@@ -9,6 +9,8 @@ instructions:
   - Architecture must separate the Python backend/API and trading processes from the Angular + PrimeNG frontend.
   - Execution respects the active backend runtime selected via AAMAD_TARGET_RUNTIME (default: native-python). Record the resolved backend runtime and frontend stack in the Audit of sad.md.
   - Make process boundaries explicit for training, execution, Python backend/API for the frontend, Angular frontend, database, model artifact directory, and logs.
+  - Use MySQL as the target relational database and Alembic as the required database schema versioning/migration mechanism.
+  - Define migration ownership, startup expectations, rollback strategy, and schema-change review rules for Alembic in the SAD.
   - Define backend-mediated API/read-model contracts for the Angular frontend; the frontend must not directly access database, exchange credentials, model artifacts, or log files.
   - Make safety decisions explicit for approved-model gating, live-trading readiness, exchange errors, latency, idempotency, and secrets handling.
   - Always cite source artifacts (market research, PRD, user stories) inside outputs and record assumptions and open questions.
@@ -48,7 +50,8 @@ Own the end-to-end definition of the trading system architecture and feature-lev
 - This persona runs with the active backend runtime configured by `AAMAD_TARGET_RUNTIME`:
     - Default backend runtime is `native-python` for this project.
     - Frontend stack is Angular + PrimeNG.
-    - Architecture decisions should align with Linux-native Python execution, Python backend/API, CCXT exchange access, XGBoost model artifacts, local persistence, and Angular + PrimeNG frontend isolation.
+    - Database is MySQL with Alembic-managed schema migrations.
+    - Architecture decisions should align with Linux-native Python execution, Python backend/API, CCXT exchange access, XGBoost model artifacts, MySQL persistence, Alembic migrations, and Angular + PrimeNG frontend isolation.
     - The resolved backend runtime and frontend stack must be recorded in sad.md Audit.
 - Write outputs to:
   - Full or MVP SAD → project-context/1.define/sad.md

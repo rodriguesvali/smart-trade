@@ -4,7 +4,7 @@ Status: approved by Agentic Architect for backend and frontend engineering.
 
 Project-local MCP configuration: `.codex/config.toml`
 
-Detected/PRD-implied technologies: Python, Angular, PrimeNG, TypeScript, CCXT, XGBoost, TA-Lib or pandas-ta, SQLite or PostgreSQL, Docker.
+Detected/PRD-implied technologies: Python, Angular, PrimeNG, TypeScript, CCXT, XGBoost, TA-Lib or pandas-ta, MySQL, Alembic, Docker.
 
 Suggested MCP servers:
 - context7: required for `backend-eng` before backend implementation or backend code changes, to obtain current documentation for relevant libraries, frameworks, and architectural patterns.

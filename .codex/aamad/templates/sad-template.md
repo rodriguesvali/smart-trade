@@ -11,6 +11,8 @@ Do not introduce chat interfaces, Next.js, assistant-ui, CrewAI, margin trading,
 **MVP Scope**: [CONFIRMED MVP SCOPE]
 **Selected Backend Runtime**: [native-python | other approved runtime]
 **Frontend Stack**: Angular + PrimeNG
+**Database**: MySQL
+**Database Versioning**: Alembic
 
 ## System Architecture Specification
 
@@ -21,6 +23,7 @@ Do not introduce chat interfaces, Next.js, assistant-ui, CrewAI, margin trading,
 - Observable by default.
 - Configuration outside code.
 - Backend-mediated frontend access.
+- Versioned database schema changes with Alembic.
 - Minimal MVP before expansion.
 
 ### 2. Stakeholders and Concerns
@@ -30,7 +33,7 @@ Do not introduce chat interfaces, Next.js, assistant-ui, CrewAI, margin trading,
 - Angular + PrimeNG frontend/operator console.
 - Python backend/API for frontend.
 - Exchange/API boundary.
-- Data/model/log storage.
+- MySQL data storage, model artifact storage, and log storage.
 
 ### 3. Scope and Constraints
 - Spot long-only.
@@ -52,6 +55,7 @@ Do not introduce chat interfaces, Next.js, assistant-ui, CrewAI, margin trading,
 - Persistence layer.
 - Python backend/API and frontend read models.
 - Angular + PrimeNG frontend.
+- Alembic migration layer.
 - Logging/observability.
 
 ### 5. Process and Runtime View
@@ -59,11 +63,13 @@ Do not introduce chat interfaces, Next.js, assistant-ui, CrewAI, margin trading,
 - Independent inference/execution process.
 - Python backend/API process for frontend read contracts and approved commands.
 - Angular frontend build/runtime boundary.
-- Shared database, model artifact directory, and log directory accessed by backend/trading processes, not directly by frontend.
+- Shared MySQL database, model artifact directory, and log directory accessed by backend/trading processes, not directly by frontend.
 - Startup and shutdown behavior.
 - Restart and recovery behavior.
 
 ### 6. Data View
+- MySQL schema ownership and schema versioning with Alembic.
+- Alembic migration history and migration execution policy.
 - Candle data.
 - Feature data.
 - Model metadata and artifacts.
@@ -97,6 +103,8 @@ Do not introduce chat interfaces, Next.js, assistant-ui, CrewAI, margin trading,
 - CCXT public and private boundaries.
 - Database access.
 - Model artifact storage.
+- MySQL access boundaries.
+- Alembic migration boundaries.
 - Python backend/API contracts for Angular frontend.
 - Frontend read models for model validation, operation, positions, metrics, and logs.
 - Backend-mediated log read paths.
@@ -109,7 +117,8 @@ Do not introduce chat interfaces, Next.js, assistant-ui, CrewAI, margin trading,
 - Python backend/API deployment strategy.
 - Shared volumes.
 - Environment variables.
-- Database initialization.
+- MySQL initialization.
+- Alembic migration execution.
 - Operational modes: training, paper, live.
 
 ### 11. Quality Attributes
@@ -119,6 +128,7 @@ Do not introduce chat interfaces, Next.js, assistant-ui, CrewAI, margin trading,
 - Observability.
 - Security and secret handling.
 - Data integrity.
+- Migration safety.
 - Reproducibility.
 - Maintainability.
 
@@ -129,6 +139,12 @@ Do not introduce chat interfaces, Next.js, assistant-ui, CrewAI, margin trading,
 - Chosen approach.
 - Consequences.
 - PRD traceability.
+
+Required decisions include:
+- MySQL connection and pooling strategy.
+- Alembic migration ownership and execution point.
+- Migration rollback/forward-fix policy.
+- Schema compatibility expectations for training, execution, and frontend read models.
 
 ### 13. Risks and Mitigations
 - Market/exchange risk.

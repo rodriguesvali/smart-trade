@@ -31,7 +31,8 @@ Example: "Crypto spot long-only quantitative trading system using a Python backe
 - CCXT capabilities and limitations for historical candles and private order methods.
 - XGBoost suitability for binary short-term confirmation signals.
 - TA-Lib vs pandas-ta tradeoffs.
-- SQLite vs PostgreSQL tradeoffs for local MVP operation.
+- MySQL operational considerations for local/containerized MVP operation.
+- Alembic schema migration and rollback/forward-fix practices.
 - Angular + PrimeNG frontend architecture and charting/data-grid tradeoffs.
 - Docker and Linux deployment considerations.
 

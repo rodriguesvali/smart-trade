@@ -12,8 +12,8 @@ alwaysApply: true
 
 ## Setup
 - Use Python as the primary runtime on Linux.
-- Approved backend PRD/alignment-implied libraries include CCXT, XGBoost, TA-Lib or pandas-ta, joblib or pickle, SQLite or PostgreSQL clients, structured logging, web/API framework dependencies selected in SAD/setup, and Docker tooling.
-- The concrete package manager, Python version, Python API framework, database, frontend build/serving strategy, and container layout must be confirmed in SAD/setup before implementation.
+- Approved backend PRD/alignment-implied libraries include CCXT, XGBoost, TA-Lib or pandas-ta, joblib or pickle, MySQL client/ORM dependencies, Alembic, structured logging, web/API framework dependencies selected in SAD/setup, and Docker tooling.
+- The concrete package manager, Python version, Python API framework, MySQL client/ORM, frontend build/serving strategy, and container layout must be confirmed in SAD/setup before implementation.
 - Configure all secrets through environment variables or non-versioned local files.
 - Provide `.env.example` with variable names only.
 
@@ -23,6 +23,7 @@ alwaysApply: true
 - Inference/execution engine: minute-aligned loop, approved model loading, binary signal generation, CCXT order submission, and state recording.
 - Strategy engine: RSI/IFR entry gating, spot long-only position lifecycle, stop loss, take profit, break even, trailing stop, and exit reasons.
 - Frontend API/read models: backend-mediated contracts for the Angular + PrimeNG frontend covering model validation, operation, equity, metrics, position state, and logs.
+- Persistence: MySQL-backed repositories and read models with Alembic-managed schema migrations.
 
 ## Execution
 - Enforce the operational sequence: configure asset -> collect history -> train -> validate -> backtest -> approve -> run.
@@ -30,6 +31,7 @@ alwaysApply: true
 - Align inference timing to the second `01` of each minute unless SAD changes this requirement.
 - Prefer paper mode before live operation and require Agentic Architect approval for live execution.
 - Design idempotent database writes and explicit state transitions for positions, orders, model status, and strategy decisions.
+- Treat Alembic migrations as reviewed build artifacts; do not apply destructive schema changes without explicit Agentic Architect approval.
 
 ## Tools
 - Bind exchange access through CCXT with least-privilege API keys.

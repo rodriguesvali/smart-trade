@@ -60,7 +60,7 @@ After generating or updating any artifact, stop and ask the Agentic Architect fo
 
 - State: pre-existing
 - Languages: Python and SQL implied by PRD; repository implementation not started.
-- Frameworks/libraries: Python, Angular, PrimeNG, TypeScript, CCXT, XGBoost, TA-Lib or pandas-ta, joblib or pickle, SQLite or PostgreSQL, Docker implied by PRD/alignment decisions.
+- Frameworks/libraries: Python, Angular, PrimeNG, TypeScript, CCXT, XGBoost, TA-Lib or pandas-ta, joblib or pickle, MySQL, Alembic, Docker implied by PRD/alignment decisions.
 - Package managers: not present in repository; Python dependency manager remains to be selected during Build setup.
 - Existing context source: `docs/proposed-solution.md`
 - Project signal: proposed PRD for a Python-native quantitative trading backend using CCXT, XGBoost, spot long-only execution, and a decoupled Angular + PrimeNG operational frontend.

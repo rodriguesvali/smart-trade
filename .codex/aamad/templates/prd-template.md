@@ -87,7 +87,8 @@ The product is not a chat application and does not require CrewAI, Next.js, or a
 - Fail-safe behavior.
 
 ### 6. Data and Model Requirements
-- Database choice and required entities.
+- MySQL database requirements and required entities.
+- Alembic schema versioning and migration requirements.
 - Model artifact format.
 - Model status lifecycle.
 - Feature set traceability.
@@ -109,7 +110,8 @@ The product is not a chat application and does not require CrewAI, Next.js, or a
 - Operational safety acceptance.
 
 ### 9. Open Questions
-- Database selection.
+- MySQL connection/runtime assumptions.
+- Alembic migration ownership and execution policy.
 - Angular charting/data visualization library selection.
 - Indicator library selection.
 - Package manager and Python version.
