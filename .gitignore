@@ -9,3 +9,4 @@ __pycache__/
 .env.*
 !.env.example
 !.devcontainer/devcontainer.env.example
+!.devcontainer/devcontainer.env
