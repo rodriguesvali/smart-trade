@@ -22,3 +22,5 @@ Do not commit MCP credentials.
 If Context7 authentication is required in the local environment, export `CONTEXT7_API_KEY` outside the repository before starting Codex.
 
 Version note: Context7 is pinned to `@upstash/context7-mcp@2.3.0` because the current host runtime is Node 18. The newer 3.x package requires newer web APIs not available in this host Node runtime.
+
+PrimeNG runtime note: the devcontainer post-create step installs the PrimeNG MCP package into `.devcontainer/mcp`, whose `node_modules/` directory is ignored by Git.

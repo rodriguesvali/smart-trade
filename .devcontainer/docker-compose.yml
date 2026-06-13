@@ -5,12 +5,10 @@ services:
       dockerfile: .devcontainer/Dockerfile
       args:
         ANGULAR_CLI_VERSION: "21.2.15"
+    user: root
     command: sleep infinity
     volumes:
       - ..:/workspaces/smart-trade:cached
-      - smart-trade-vscode-extensions:/home/vscode/.vscode-server/extensions
-      - smart-trade-npm-cache:/home/vscode/.npm
-      - smart-trade-pip-cache:/home/vscode/.cache/pip
     environment:
       SMART_TRADE_ENV: development
       SMART_TRADE_DB_HOST: mysql
@@ -52,11 +50,7 @@ services:
 
 volumes:
   smart-trade-mysql-data:
-  smart-trade-vscode-extensions:
-  smart-trade-npm-cache:
-  smart-trade-pip-cache:
 
 networks:
   smart-trade:
     driver: bridge
-

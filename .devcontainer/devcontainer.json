@@ -3,6 +3,8 @@
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
   "workspaceFolder": "/workspaces/smart-trade",
+  "containerUser": "root",
+  "remoteUser": "root",
   "shutdownAction": "stopCompose",
   "postCreateCommand": ".devcontainer/post-create.sh",
   "forwardPorts": [4200, 8000, 3306],
@@ -28,13 +30,15 @@
         "charliermarsh.ruff",
         "ms-azuretools.vscode-docker",
         "Angular.ng-template",
-        "esbenp.prettier-vscode"
+        "esbenp.prettier-vscode",
+        "openai.chatgpt",
+        "odriguesvali.git-revision-graph"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
         "python.terminal.activateEnvironment": false,
         "editor.formatOnSave": true,
-        "typescript.tsdk": "frontend/node_modules/typescript/lib"
+        "js/ts.tsdk.path": "frontend/node_modules/typescript/lib"
       }
     }
   },
@@ -42,4 +46,3 @@
     "PATH": "/usr/local/py-utils/bin:${containerEnv:PATH}"
   }
 }
-
