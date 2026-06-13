@@ -1,0 +1,10 @@
+# Project-local MCP server configuration for Smart Trade.
+# Keep secrets out of this file. Export required credentials in the local shell/session.
+
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp@3.2.0"]
+
+[mcp_servers.primeng]
+command = "npx"
+args = ["-y", "@primeng/mcp@21.1.9"]
