@@ -3,8 +3,8 @@
 
 [mcp_servers.context7]
 command = "npx"
-args = ["-y", "@upstash/context7-mcp@3.2.0"]
+args = ["-y", "@upstash/context7-mcp@2.3.0"]
 
 [mcp_servers.primeng]
-command = "npx"
-args = ["-y", "@primeng/mcp@21.1.9"]
+command = "npm"
+args = ["--prefix", ".devcontainer/mcp", "exec", "--", "primeng-mcp"]

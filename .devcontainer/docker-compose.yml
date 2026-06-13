@@ -1,0 +1,62 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+      args:
+        ANGULAR_CLI_VERSION: "21.2.15"
+    command: sleep infinity
+    volumes:
+      - ..:/workspaces/smart-trade:cached
+      - smart-trade-vscode-extensions:/home/vscode/.vscode-server/extensions
+      - smart-trade-npm-cache:/home/vscode/.npm
+      - smart-trade-pip-cache:/home/vscode/.cache/pip
+    environment:
+      SMART_TRADE_ENV: development
+      SMART_TRADE_DB_HOST: mysql
+      SMART_TRADE_DB_PORT: "3306"
+      SMART_TRADE_DB_NAME: smart_trade
+      SMART_TRADE_DB_USER: smart_trade
+      SMART_TRADE_DB_PASSWORD: smart_trade
+      DATABASE_URL: mysql+pymysql://smart_trade:smart_trade@mysql:3306/smart_trade
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - smart-trade
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+00:00
+    environment:
+      MYSQL_ROOT_PASSWORD: smart_trade_root
+      MYSQL_DATABASE: smart_trade
+      MYSQL_USER: smart_trade
+      MYSQL_PASSWORD: smart_trade
+    ports:
+      - "3306:3306"
+    volumes:
+      - smart-trade-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -usmart_trade -psmart_trade --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - smart-trade
+
+volumes:
+  smart-trade-mysql-data:
+  smart-trade-vscode-extensions:
+  smart-trade-npm-cache:
+  smart-trade-pip-cache:
+
+networks:
+  smart-trade:
+    driver: bridge
+

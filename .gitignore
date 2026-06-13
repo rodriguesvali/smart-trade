@@ -1,0 +1,11 @@
+.devcontainer/mcp/node_modules/
+.venv/
+node_modules/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.env
+.env.*
+!.env.example
+!.devcontainer/devcontainer.env.example
