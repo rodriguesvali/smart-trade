@@ -47,6 +47,8 @@ import { ModelSummary, StrategySummary } from './api/operator-api';
               <th>Version</th>
               <th>Status</th>
               <th>Roles</th>
+              <th>Features</th>
+              <th>Compatibility</th>
             </tr>
           </ng-template>
           <ng-template pTemplate="body" let-strategy>
@@ -54,12 +56,19 @@ import { ModelSummary, StrategySummary } from './api/operator-api';
               <td>{{ strategy.name }}</td>
               <td>{{ strategy.version }}</td>
               <td><p-tag [severity]="strategy.id === selectedStrategyId ? 'success' : 'info'" [value]="strategy.status" /></td>
-              <td>{{ strategy.model_roles.length }}</td>
+              <td>{{ roleLabels(strategy) }}</td>
+              <td>{{ strategy.required_features.length }}</td>
+              <td>
+                <p-tag
+                  [severity]="strategy.compatibility.compatible ? 'success' : 'warn'"
+                  [value]="strategy.compatibility.compatible ? 'READY' : 'BLOCKED'"
+                />
+              </td>
             </tr>
           </ng-template>
           <ng-template pTemplate="emptymessage">
             <tr>
-              <td colspan="4">No strategies registered yet.</td>
+              <td colspan="6">No strategies registered yet.</td>
             </tr>
           </ng-template>
         </p-table>
@@ -71,4 +80,10 @@ export class ModelsViewComponent {
   @Input() models: ModelSummary[] = [];
   @Input() strategies: StrategySummary[] = [];
   @Input() selectedStrategyId: number | null = null;
+
+  roleLabels(strategy: StrategySummary): string {
+    return strategy.model_roles
+      .map((role) => String(role['role'] ?? 'role'))
+      .join(', ');
+  }
 }

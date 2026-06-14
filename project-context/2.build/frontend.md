@@ -211,3 +211,52 @@ Playwright screenshot:
 ## 4. Intentional Non-Scope
 
 B3 did not replace the operation chart's local placeholder data. Real operational chart markers/equity remain tied to later B6 paper-operation read models.
+
+---
+
+# B4 Frontend Update - Strategy Requirements Visibility
+
+Status: Draft for Agentic Architect review  
+Persona: @frontend.eng  
+Date: 2026-06-14
+
+## 1. Scope Completed
+
+B4 updated the operational console to expose backend strategy plugin requirements.
+
+Implemented:
+
+- Extended the typed Angular strategy contract with:
+  - `parameter_schema`;
+  - `compatibility`;
+  - strategy risk rules under compatibility.
+- Updated the Strategy Registry table to show:
+  - required model role labels;
+  - required feature count;
+  - compatibility tag (`READY` or `BLOCKED`).
+
+## 2. Documentation Consulted
+
+Context7 was consulted for Angular standalone component imports, template helpers, and built-in pipe/component template patterns.
+
+PrimeNG MCP was consulted for:
+
+- `Table`;
+- `Tag`.
+
+## 3. Verification
+
+Executed successfully:
+
+```bash
+npm --prefix frontend run build
+```
+
+Result:
+
+- Angular production build completed successfully.
+- Remaining warnings: initial bundle exceeds the 500 kB warning budget and root component style exceeds the 4 kB warning budget; both remain below error budgets.
+
+## 4. Intentional Non-Scope
+
+B4 frontend did not implement strategy selection controls or parameter editing. Selection remains available through backend API/command contract for this increment.

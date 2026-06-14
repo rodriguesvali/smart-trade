@@ -29,9 +29,11 @@ class StrategySummary(BaseModel):
     supported_market: str
     supported_direction: str
     timeframes: list[str]
+    parameter_schema: dict[str, Any]
     required_features: list[str]
     model_roles: list[dict[str, Any]]
     default_parameters: dict[str, Any]
+    compatibility: dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -39,6 +41,22 @@ class StrategySummary(BaseModel):
 class StrategiesResponse(BaseModel):
     selected_strategy_id: int | None
     items: list[StrategySummary]
+
+
+class SelectedStrategyCreate(BaseModel):
+    strategy_registry_id: int = Field(ge=1)
+    parameters: dict[str, Any] = Field(default_factory=dict)
+
+
+class SelectedStrategySummary(BaseModel):
+    id: int
+    strategy_registry_id: int
+    status: str
+    parameters: dict[str, Any]
+    selected_at: datetime
+    deselected_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ModelSummary(BaseModel):

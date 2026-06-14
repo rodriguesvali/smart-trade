@@ -37,7 +37,9 @@ def test_b1_read_contracts_return_empty_state() -> None:
     assert config_response.json()["symbol"] == "BTC/USDT"
     assert config_response.json()["timeframe"] == "1m"
     assert strategies_response.status_code == 200
-    assert strategies_response.json() == {"selected_strategy_id": None, "items": []}
+    assert strategies_response.json()["selected_strategy_id"] is None
+    assert strategies_response.json()["items"][0]["strategy_id"] == "default_rsi_xgboost_long"
+    assert strategies_response.json()["items"][0]["compatibility"]["compatible"] is False
     assert models_response.status_code == 200
     assert models_response.json() == {"items": []}
     assert operation_response.status_code == 200

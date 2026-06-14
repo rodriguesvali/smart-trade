@@ -21,7 +21,10 @@ from smart_trade_backend.api.schemas import (
     MarketDataStatus,
     ModelsResponse,
     OperationStatus,
+    SelectedStrategyCreate,
+    SelectedStrategySummary,
     StrategiesResponse,
+    StrategySummary,
 )
 from smart_trade_backend.application.commands import create_command_request
 from smart_trade_backend.application.market_data.features import PythonFallbackFeatureCalculator
@@ -38,6 +41,12 @@ from smart_trade_backend.application.read_models import (
     list_models,
     list_strategies,
     operation_status,
+)
+from smart_trade_backend.application.strategy.registry import (
+    StrategySelectionError,
+    register_available_strategies,
+    select_strategy,
+    strategy_compatibility,
 )
 from smart_trade_backend.config import get_settings
 
@@ -61,13 +70,47 @@ def get_configuration_summary() -> dict:
 
 @router.get("/strategies", response_model=StrategiesResponse)
 def get_strategies(session: SessionDep) -> dict:
+    settings = get_settings()
+    register_available_strategies(session)
     selected_strategy = get_selected_strategy(session)
     return {
         "selected_strategy_id": selected_strategy.strategy_registry_id
         if selected_strategy is not None
         else None,
-        "items": list_strategies(session),
+        "items": [
+            _strategy_summary(record, strategy_compatibility(session, settings, record))
+            for record in list_strategies(session)
+        ],
     }
+
+
+@router.post("/strategies/register", response_model=StrategiesResponse)
+def post_strategy_registration(session: SessionDep) -> dict:
+    settings = get_settings()
+    register_available_strategies(session)
+    selected_strategy = get_selected_strategy(session)
+    return {
+        "selected_strategy_id": selected_strategy.strategy_registry_id
+        if selected_strategy is not None
+        else None,
+        "items": [
+            _strategy_summary(record, strategy_compatibility(session, settings, record))
+            for record in list_strategies(session)
+        ],
+    }
+
+
+@router.post("/strategies/select", response_model=SelectedStrategySummary, status_code=201)
+def post_strategy_selection(request: SelectedStrategyCreate, session: SessionDep):
+    try:
+        return select_strategy(
+            session,
+            get_settings(),
+            strategy_registry_id=request.strategy_registry_id,
+            parameters=request.parameters,
+        )
+    except StrategySelectionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/models", response_model=ModelsResponse)
@@ -132,6 +175,7 @@ def post_feature_generation(session: SessionDep) -> dict:
 def post_command(request: CommandRequestCreate, session: SessionDep):
     return create_command_request(
         session,
+        settings=get_settings(),
         command_type=request.command_type,
         requested_by=request.requested_by,
         payload=request.payload,
@@ -145,3 +189,9 @@ def _feature_calculator():
     except ImportError:
         return PythonFallbackFeatureCalculator()
     return TalibFeatureCalculator()
+
+
+def _strategy_summary(record, compatibility: dict) -> StrategySummary:
+    return StrategySummary.model_validate(record).model_copy(
+        update={"compatibility": compatibility}
+    )

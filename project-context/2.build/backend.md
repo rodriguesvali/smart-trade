@@ -204,6 +204,103 @@ Recommended next step: B2.
 
 ---
 
+# B4 Backend - Strategy Plugin Contract and Default Strategy
+
+Status: Draft for Agentic Architect review  
+Persona: @backend.eng  
+Date: 2026-06-14  
+Source artifacts: `project-context/1.define/prd.md`, `project-context/1.define/sad.md`, `project-context/2.build/build-plan.md`, `project-context/2.build/backend.md`
+
+## 1. Scope Completed
+
+B4 implemented the code-deployed strategy plugin contract and the default MVP strategy registration/selection path.
+
+Implemented:
+
+- Strategy plugin domain contract with metadata, parameter schema, required features, required model roles, risk rules, config validation, and runtime compatibility checks.
+- Code-deployed plugin discovery through `smart_trade_backend.strategies.discover_strategy_plugins`.
+- Default MVP strategy plugin:
+  - `default_rsi_xgboost_long`;
+  - spot-only;
+  - long-only;
+  - M1/`1m`;
+  - RSI/IFR oversold setup;
+  - one XGBoost binary model role: `entry_confirmation`.
+- Strategy registry application service:
+  - idempotent registration/upsert into `strategy_registry`;
+  - persisted model-role and required-feature declarations;
+  - selected strategy persistence in `selected_strategies`;
+  - rejection when config validation or runtime compatibility fails.
+- Runtime compatibility requires the B3 feature schema to expose all default strategy features before selection.
+- FastAPI strategy endpoints:
+  - `GET /api/strategies`;
+  - `POST /api/strategies/register`;
+  - `POST /api/strategies/select`.
+- `SELECT_STRATEGY` command handling now completes or fails auditably instead of only creating a requested command.
+- Startup strategy registration is enabled when startup migrations are enabled.
+
+## 2. Documentation Consulted
+
+Context7 was consulted before backend implementation:
+
+- Pydantic `/pydantic/pydantic`: `model_validate`, `Field` constraints, and validation error handling.
+- FastAPI `/fastapi/fastapi`: request body schemas, response models, and `HTTPException` patterns.
+- SQLAlchemy `/websites/sqlalchemy_en_20`: ORM `select`, `update`, session commit/refresh patterns.
+
+## 3. API Contract Updates
+
+`GET /api/strategies` now returns registered strategy items including:
+
+- `parameter_schema`;
+- `required_features`;
+- `model_roles`;
+- `default_parameters`;
+- `compatibility.compatible`;
+- `compatibility.reasons`;
+- `compatibility.risk_rules`.
+
+`POST /api/strategies/select` requires:
+
+- `strategy_registry_id`;
+- optional `parameters`.
+
+Selection fails with HTTP 400 when:
+
+- the strategy is not deployed in code;
+- the parameter config is invalid;
+- market type, direction, or timeframe is incompatible;
+- required B3 features are missing.
+
+## 4. Verification
+
+Executed successfully:
+
+```bash
+cd backend
+uv run pytest
+uv run ruff check .
+```
+
+Result:
+
+- `10 passed`.
+- Existing FastAPI/Starlette TestClient deprecation warning remains unchanged.
+- Ruff returned `All checks passed.`
+
+## 5. Intentional Non-Scope
+
+B4 did not implement:
+
+- XGBoost training;
+- model registry approval behavior;
+- inference;
+- strategy signal execution;
+- order submission;
+- paper/live operation start;
+- frontend strategy parameter editing.
+
+---
+
 # B3 Backend - Historical Data and Feature Pipeline
 
 Status: Draft for Agentic Architect review  

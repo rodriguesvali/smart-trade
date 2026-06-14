@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     database_url: str = "mysql+pymysql://smart_trade:smart_trade@mysql:3306/smart_trade"
     run_migrations_on_startup: bool = True
+    register_strategies_on_startup: bool = True
     exchange: str = "bybit"
     symbol: str = "BTC/USDT"
     timeframe: str = "1m"

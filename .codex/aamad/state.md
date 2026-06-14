@@ -14,7 +14,7 @@ Frontend stack: Angular + PrimeNG.
 
 ## Current Stage
 
-Define phase completed and approved by the Agentic Architect on 2026-06-14. Build phase B0 setup was completed and approved by the Agentic Architect on 2026-06-14. Build phase B1 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B2 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B3 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B4 is the next increment and must not begin until explicitly requested or redirected by the Agentic Architect.
+Define phase completed and approved by the Agentic Architect on 2026-06-14. Build phase B0 setup was completed and approved by the Agentic Architect on 2026-06-14. Build phase B1 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B2 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B3 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B4 was completed and approved by the Agentic Architect on 2026-06-14. QA scenario planning for B0-B8 has been drafted and is pending Agentic Architect review.
 
 AAMAD files generated from the upstream IDE format were adapted into `.codex/aamad/`. AAMAD Flow should use only the Codex-local files in this repository.
 
@@ -40,8 +40,8 @@ AAMAD files generated from the upstream IDE format were adapted into `.codex/aam
 
 ## Pending Artifacts
 
-- Build B4 artifact for the strategy plugin contract and default strategy.
+- `project-context/2.build/qa.md`
 
 ## Review Gate
 
-B3 gate is approved. Continue to B4 only after the Agentic Architect explicitly requests or redirects the next Build increment.
+B4 gate has been approved by the Agentic Architect. B5 may begin when the Agentic Architect explicitly directs the next Build increment. QA scenario planning remains pending review.

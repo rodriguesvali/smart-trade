@@ -4,6 +4,7 @@ from typing import Any
 from fastapi import FastAPI
 
 from smart_trade_backend.api.routes import router as api_router
+from smart_trade_backend.application.strategy.registry import register_available_strategies
 from smart_trade_backend.config import get_settings
 from smart_trade_backend.db import check_database, create_db_engine, create_session_factory
 from smart_trade_backend.migrations import run_startup_migrations
@@ -17,6 +18,9 @@ async def lifespan(app: FastAPI):
     app.state.settings = settings
     app.state.db_engine = create_db_engine(settings)
     app.state.db_session_factory = create_session_factory(app.state.db_engine)
+    if settings.register_strategies_on_startup and settings.run_migrations_on_startup:
+        with app.state.db_session_factory() as session:
+            register_available_strategies(session)
     yield
     app.state.db_engine.dispose()
 

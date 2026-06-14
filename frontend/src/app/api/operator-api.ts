@@ -32,9 +32,15 @@ export interface StrategySummary {
   supported_market: string;
   supported_direction: string;
   timeframes: string[];
+  parameter_schema: Record<string, unknown>;
   required_features: string[];
   model_roles: Record<string, unknown>[];
   default_parameters: Record<string, unknown>;
+  compatibility: {
+    compatible: boolean;
+    reasons: string[];
+    risk_rules: Record<string, unknown>[];
+  };
 }
 
 export interface StrategiesResponse {
