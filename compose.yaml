@@ -1,0 +1,50 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    environment:
+      SMART_TRADE_ENVIRONMENT: development
+      SMART_TRADE_DATABASE_URL: mysql+pymysql://smart_trade:smart_trade@mysql:3306/smart_trade
+      SMART_TRADE_RUN_MIGRATIONS_ON_STARTUP: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./var/models:/workspaces/smart-trade/var/models
+      - ./var/logs:/workspaces/smart-trade/var/logs
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+00:00
+    environment:
+      MYSQL_ROOT_PASSWORD: smart_trade_root
+      MYSQL_DATABASE: smart_trade
+      MYSQL_USER: smart_trade
+      MYSQL_PASSWORD: smart_trade
+    ports:
+      - "3306:3306"
+    volumes:
+      - smart-trade-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -usmart_trade -psmart_trade --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  smart-trade-mysql-data:

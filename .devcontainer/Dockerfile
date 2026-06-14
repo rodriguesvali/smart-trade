@@ -1,12 +1,14 @@
 # syntax=docker/dockerfile:1
 
 FROM node:22-bookworm-slim AS node
+FROM ghcr.io/astral-sh/uv:latest AS uv
 
-FROM mcr.microsoft.com/devcontainers/python:1-3.12-bookworm
+FROM mcr.microsoft.com/devcontainers/python:1-3.14-bookworm
 
 ARG ANGULAR_CLI_VERSION=21.2.15
 
 COPY --from=node /usr/local /usr/local
+COPY --from=uv /uv /usr/local/bin/uv
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \

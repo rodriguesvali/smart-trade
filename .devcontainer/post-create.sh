@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-python -m pip install --upgrade pip pipx
-
-if [ -f "backend/requirements-dev.txt" ]; then
-  python -m pip install -r backend/requirements-dev.txt
-elif [ -f "requirements-dev.txt" ]; then
-  python -m pip install -r requirements-dev.txt
+if [ -f "backend/pyproject.toml" ]; then
+  uv sync --project backend --all-groups
 fi
 
 if [ -f "frontend/package-lock.json" ]; then
@@ -23,6 +19,7 @@ else
 fi
 
 python --version
+uv --version
 node --version
 npm --version
 ng version

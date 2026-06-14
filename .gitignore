@@ -10,3 +10,4 @@ __pycache__/
 !.env.example
 !.devcontainer/devcontainer.env.example
 !.devcontainer/devcontainer.env
+var/

@@ -1,0 +1,53 @@
+<main class="app-shell">
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Build B0</p>
+      <h1>{{ title() }}</h1>
+    </div>
+
+    <p-tag
+      [severity]="backendStatus() === 'ok' ? 'success' : backendStatus() === 'error' ? 'danger' : 'warn'"
+      [value]="backendLabel()"
+    />
+  </header>
+
+  <section class="status-grid">
+    <p-card header="Runtime">
+      <dl>
+        <div>
+          <dt>Backend</dt>
+          <dd>Python 3.14, FastAPI, uv</dd>
+        </div>
+        <div>
+          <dt>Frontend</dt>
+          <dd>Angular, PrimeNG, TradingView Lightweight Charts</dd>
+        </div>
+        <div>
+          <dt>Database</dt>
+          <dd>MySQL with Alembic startup migrations</dd>
+        </div>
+      </dl>
+
+      <p-button label="Check backend" icon="pi pi-refresh" (onClick)="checkBackend()" />
+    </p-card>
+
+    <p-card header="MVP Envelope">
+      <dl>
+        <div>
+          <dt>Exchange</dt>
+          <dd>Bybit spot</dd>
+        </div>
+        <div>
+          <dt>Asset</dt>
+          <dd>BTC/USDT, M1</dd>
+        </div>
+        <div>
+          <dt>Mode</dt>
+          <dd>Paper before live</dd>
+        </div>
+      </dl>
+    </p-card>
+  </section>
+
+  <router-outlet />
+</main>
