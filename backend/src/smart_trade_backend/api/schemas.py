@@ -71,6 +71,11 @@ class ModelSummary(BaseModel):
     status: str
     artifact_uri: str | None
     metrics: dict[str, Any]
+    parameters: dict[str, Any]
+    training_window_start: datetime | None
+    training_window_end: datetime | None
+    holdout_start: datetime | None
+    holdout_end: datetime | None
     approved_at: datetime | None
     created_at: datetime
 
@@ -79,6 +84,74 @@ class ModelSummary(BaseModel):
 
 class ModelsResponse(BaseModel):
     items: list[ModelSummary]
+
+
+class ModelTrainingRunSummary(BaseModel):
+    id: int
+    model_id: str
+    model_role: str
+    strategy_id: str
+    strategy_version: str
+    feature_schema_id: str
+    status: str
+    started_at: datetime
+    completed_at: datetime | None
+    training_rows: int
+    holdout_rows: int
+    metrics: dict[str, Any]
+    error_message: str | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ModelTrainingRunsResponse(BaseModel):
+    items: list[ModelTrainingRunSummary]
+
+
+class ModelTrainingResponse(BaseModel):
+    items: list[ModelSummary]
+
+
+class ModelApprovalResponse(BaseModel):
+    model: ModelSummary
+
+
+class WalkForwardWindowSummary(BaseModel):
+    id: int
+    model_id: str
+    window_index: int
+    train_start: datetime
+    train_end: datetime
+    validation_start: datetime
+    validation_end: datetime
+    precision_class_1: Decimal
+    predicted_positive_count: int
+    actual_positive_count: int
+    acceptable: bool
+    metrics: dict[str, Any]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BacktestTradeSummary(BaseModel):
+    id: int
+    model_id: str
+    trade_index: int
+    entry_at: datetime
+    exit_at: datetime
+    entry_price: Decimal
+    exit_price: Decimal
+    quantity: Decimal
+    pnl: Decimal
+    pnl_pct: Decimal
+    exit_reason: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ModelEvidenceResponse(BaseModel):
+    windows: list[WalkForwardWindowSummary]
+    trades: list[BacktestTradeSummary]
 
 
 class OperationStatus(BaseModel):

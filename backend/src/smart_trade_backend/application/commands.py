@@ -4,6 +4,10 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from smart_trade_backend.adapters.persistence.models import CommandRequestRecord
+from smart_trade_backend.application.model_training.service import (
+    ModelApprovalError,
+    approve_model,
+)
 from smart_trade_backend.application.strategy.registry import (
     StrategySelectionError,
     select_strategy,
@@ -45,6 +49,19 @@ def create_command_request(
         else:
             status = CommandStatus.COMPLETED
             result = {"selected_strategy_record_id": selected.id}
+    elif command_type == CommandType.APPROVE_MODEL and settings is not None:
+        try:
+            approved = approve_model(
+                session,
+                settings,
+                model_id=str(payload["model_id"]),
+            )
+        except (KeyError, TypeError, ValueError, ModelApprovalError) as exc:
+            status = CommandStatus.FAILED
+            result = {"reason": str(exc)}
+        else:
+            status = CommandStatus.COMPLETED
+            result = {"model_id": approved.model_id, "status": approved.status}
 
     record = CommandRequestRecord(
         command_type=command_type.value,

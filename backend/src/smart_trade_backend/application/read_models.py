@@ -76,11 +76,32 @@ def latest_events(session: Session, limit: int = 50) -> list[OperationalEventRec
 
 def operation_status(session: Session, settings: Settings) -> dict[str, Any]:
     selected_strategy = get_selected_strategy(session)
-    active_models_count = session.scalar(
+    approved_models_count = session.scalar(
         select(func.count())
         .select_from(ModelRegistryRecord)
         .where(ModelRegistryRecord.status.in_(["APPROVED", "ACTIVE"]))
     )
+    active_models_count = approved_models_count or 0
+    if selected_strategy is not None:
+        strategy = session.get(StrategyRegistryRecord, selected_strategy.strategy_registry_id)
+        required_roles = [
+            str(role["role"])
+            for role in (strategy.model_roles if strategy is not None else [])
+            if "role" in role
+        ]
+        compatible_models_count = session.scalar(
+            select(func.count())
+            .select_from(ModelRegistryRecord)
+            .where(
+                ModelRegistryRecord.status.in_(["APPROVED", "ACTIVE"]),
+                ModelRegistryRecord.strategy_id == strategy.strategy_id if strategy else False,
+                ModelRegistryRecord.strategy_version == strategy.version if strategy else False,
+                ModelRegistryRecord.model_role.in_(required_roles),
+                ModelRegistryRecord.asset_symbol == settings.symbol,
+                ModelRegistryRecord.timeframe == settings.timeframe,
+            )
+        )
+        active_models_count = compatible_models_count or 0
     open_positions_count = session.scalar(
         select(func.count())
         .select_from(PositionRecord)
@@ -96,7 +117,7 @@ def operation_status(session: Session, settings: Settings) -> dict[str, Any]:
     if selected_strategy is None:
         blockers.append("No selected strategy.")
     if not active_models_count:
-        blockers.append("No approved or active model.")
+        blockers.append("No compatible approved or active model for the selected strategy.")
 
     state = OperationState.IDLE
     if blockers:

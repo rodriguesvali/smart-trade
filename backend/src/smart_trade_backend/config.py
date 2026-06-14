@@ -18,6 +18,17 @@ class Settings(BaseSettings):
     historical_ingestion_page_size: int = 200
     candle_retention_days: int = 120
     feature_retention_days: int = 120
+    model_artifact_dir: str = "var/model-artifacts"
+    model_training_min_rows: int = 80
+    model_holdout_fraction: float = 0.20
+    model_holdout_min_rows: int = 20
+    model_walk_forward_windows: int = 3
+    model_min_precision_class_1: float = 0.50
+    model_min_trade_count: int = 1
+    model_min_profit_factor: float = 1.0
+    model_min_acceptable_walk_forward_windows: int = 1
+    backtest_fee_rate: float = 0.001
+    backtest_slippage_rate: float = 0.0005
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -515,3 +515,125 @@ Recommended next step after Agentic Architect approval: B4.
 `@qa.eng`:
 
 - Validate ingestion idempotency, feature schema reproducibility, no look-ahead behavior, migration ordering, and public-only exchange access.
+
+---
+
+# B5 Backend - Model Training, Validation, Backtest, and Approval
+
+Status: Draft for Agentic Architect review  
+Persona: @backend.eng  
+Date: 2026-06-14  
+Source artifacts: `project-context/1.define/prd.md`, `project-context/1.define/sad.md`, `project-context/2.build/build-plan.md`, `project-context/2.build/backend.md`
+
+## 1. Scope Completed
+
+B5 implemented the approved-model production path before any paper/live operation loop exists.
+
+Implemented:
+
+- XGBoost-backed binary model trainer adapter for the selected strategy model role.
+- Chronological dataset construction from B3 candles/features using strategy-declared feature names.
+- Final holdout separation after the training/walk-forward period.
+- Walk-forward validation windows that train on earlier rows and validate on later rows.
+- Out-of-sample holdout backtest for the default spot long-only strategy:
+  - RSI/IFR oversold entry gate;
+  - model probability confirmation;
+  - one position at a time;
+  - no scaling;
+  - fee and slippage assumptions;
+  - stop loss and take profit exits.
+- Model artifact persistence under `SMART_TRADE_MODEL_ARTIFACT_DIR`.
+- Model registry metadata for strategy ID/version, model role, feature schema, windows, metrics, parameters, and artifact URI.
+- Manual approval service and endpoint blocked by minimum thresholds.
+- Approval now also requires a readable JSON model artifact plus matching readable artifact metadata.
+- B5 persistence tables:
+  - `model_training_runs`;
+  - `walk_forward_windows`;
+  - `backtest_trades`.
+- Alembic migration `20260614_0003_b5_model_training.py`.
+- Backend API contracts:
+  - `POST /api/models/train`;
+  - `POST /api/models/{model_id}/approve`;
+  - `GET /api/models/training-runs`;
+  - `GET /api/models/{model_id}/evidence`.
+- `APPROVE_MODEL` command handling now approves or fails auditably.
+
+## 2. Documentation Consulted
+
+Context7 was consulted before backend implementation:
+
+- XGBoost `/dmlc/xgboost`: `XGBClassifier`, binary logistic objective, `fit`, `predict_proba`, and JSON model save patterns.
+- SQLAlchemy `/websites/sqlalchemy_en_20`: ORM `Session`, `select`, add/commit patterns, and 2.0 query style.
+- FastAPI `/fastapi/fastapi`: response model and Pydantic request/response contract patterns.
+
+## 3. Approval Gate
+
+Manual approval is blocked unless model metrics satisfy configured thresholds:
+
+- `precision_class_1 >= SMART_TRADE_MODEL_MIN_PRECISION_CLASS_1`;
+- `trade_count >= SMART_TRADE_MODEL_MIN_TRADE_COUNT`;
+- `profit_factor >= SMART_TRADE_MODEL_MIN_PROFIT_FACTOR`;
+- `acceptable_walk_forward_windows >= SMART_TRADE_MODEL_MIN_ACCEPTABLE_WALK_FORWARD_WINDOWS`.
+
+Approved models remain traceable by:
+
+- `model_id`;
+- `model_role`;
+- `strategy_id` and `strategy_version`;
+- `asset_symbol` and `timeframe`;
+- `feature_schema_id`;
+- training and holdout windows;
+- artifact URI;
+- persisted validation/backtest metrics.
+
+## 4. Verification
+
+Executed successfully:
+
+```bash
+cd backend
+uv run pytest
+uv run ruff check .
+```
+
+Result:
+
+- `14 passed`.
+- Existing FastAPI/Starlette TestClient deprecation warning remains unchanged.
+- Ruff returned `All checks passed.`
+
+Executed successfully:
+
+```bash
+cd backend
+SMART_TRADE_DATABASE_URL=sqlite+pysqlite:////tmp/smart_trade_b5_migration.db uv run alembic upgrade head
+SMART_TRADE_DATABASE_URL=sqlite+pysqlite:////tmp/smart_trade_b5_migration.db uv run alembic current
+```
+
+Result:
+
+- Alembic upgraded to `20260614_0003 (head)`.
+
+Executed successfully:
+
+```bash
+cd backend
+uv run --group training python -c "import xgboost; print(xgboost.__version__)"
+```
+
+Result:
+
+- `xgboost 3.2.0`
+
+## 5. Intentional Non-Scope
+
+B5 did not implement:
+
+- paper runtime loop;
+- live inference loop;
+- model loading for runtime inference;
+- exchange private API calls;
+- paper or live orders;
+- frontend model approval buttons.
+
+B6 must still enforce that every selected-strategy model role has a compatible `APPROVED` or `ACTIVE` model before paper operation can start.

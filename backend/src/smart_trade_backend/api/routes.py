@@ -19,7 +19,11 @@ from smart_trade_backend.api.schemas import (
     FeatureGenerationResponse,
     IngestionRunCreate,
     MarketDataStatus,
+    ModelApprovalResponse,
+    ModelEvidenceResponse,
     ModelsResponse,
+    ModelTrainingResponse,
+    ModelTrainingRunsResponse,
     OperationStatus,
     SelectedStrategyCreate,
     SelectedStrategySummary,
@@ -33,6 +37,15 @@ from smart_trade_backend.application.market_data.ingestion import (
     generate_features_for_market,
     latest_candles,
     market_data_status,
+)
+from smart_trade_backend.application.model_training.service import (
+    ModelApprovalError,
+    ModelTrainingError,
+    approve_model,
+    backtest_trades_for_model,
+    latest_training_runs,
+    train_selected_strategy_models,
+    walk_forward_windows_for_model,
 )
 from smart_trade_backend.application.read_models import (
     configuration_summary,
@@ -116,6 +129,37 @@ def post_strategy_selection(request: SelectedStrategyCreate, session: SessionDep
 @router.get("/models", response_model=ModelsResponse)
 def get_models(session: SessionDep) -> dict:
     return {"items": list_models(session)}
+
+
+@router.post("/models/train", response_model=ModelTrainingResponse, status_code=201)
+def post_model_training(session: SessionDep) -> dict:
+    try:
+        return {"items": train_selected_strategy_models(session, get_settings())}
+    except ModelTrainingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/models/{model_id}/approve", response_model=ModelApprovalResponse)
+def post_model_approval(model_id: str, session: SessionDep) -> dict:
+    try:
+        return {"model": approve_model(session, get_settings(), model_id=model_id)}
+    except ModelApprovalError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/models/training-runs", response_model=ModelTrainingRunsResponse)
+def get_model_training_runs(
+    session: SessionDep, limit: int = Query(default=20, ge=1, le=100)
+) -> dict:
+    return {"items": latest_training_runs(session, limit=limit)}
+
+
+@router.get("/models/{model_id}/evidence", response_model=ModelEvidenceResponse)
+def get_model_evidence(model_id: str, session: SessionDep) -> dict:
+    return {
+        "windows": walk_forward_windows_for_model(session, model_id),
+        "trades": backtest_trades_for_model(session, model_id),
+    }
 
 
 @router.get("/operation/status", response_model=OperationStatus)

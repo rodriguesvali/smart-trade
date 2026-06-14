@@ -11,8 +11,8 @@ This artifact defines the Smart Trade MVP test scenarios from the QA perspective
 
 The scenarios are split into:
 
-- **Executable now**: B0-B4 behavior currently implemented.
-- **Prepared for later increments**: B5-B8 behavior required by PRD/SAD but not implemented yet.
+- **Executable now**: B0-B5 behavior currently implemented.
+- **Prepared for later increments**: B6-B8 behavior required by PRD/SAD but not implemented yet.
 
 QA must not validate with real capital unless the Agentic Architect explicitly approves a live-readiness test window. B8 live tests must be preceded by B6 paper evidence and B7 readiness approval.
 
@@ -25,6 +25,7 @@ Current implemented increments:
 - B2: minimal Angular + PrimeNG operational console.
 - B3: public CCXT OHLCV ingestion and feature pipeline.
 - B4: strategy plugin contract, default strategy registration, strategy selection gate, frontend strategy requirements visibility.
+- B5: model training, walk-forward validation, holdout backtest, model artifact persistence, and manual approval gate.
 
 Current automated baseline:
 
@@ -104,9 +105,9 @@ Evidence:
 | QA-B4-007 | Invalid parameters are rejected | RF2.5.2.1, RF2.5.20 | Submit invalid thresholds or invalid risk relationships. | API rejects selection; no selected strategy changes. | High |
 | QA-B4-008 | Incompatible market/timeframe/direction is rejected | RF2.5.5, AC8.17 | Override runtime context in service-level test. | Compatibility fails for non-spot, non-long-only, or non-`1m` runtime. | Critical |
 | QA-B4-009 | Risk rules are visible to backend/frontend | RF2.5.10-RF2.5.17, RF3.7, RF4.9 | Call strategy API and inspect dashboard registry. | API returns stop-loss, one-position, take-profit/protected-exit rules; frontend shows strategy readiness/requirements. | High |
-| QA-B4-010 | Strategy registration does not bypass model approval | RF2.5.20, AC8.6 | Select compatible strategy without approved model. | Operation remains `NOT_READY` with `No approved or active model.` | Critical |
+| QA-B4-010 | Strategy registration does not bypass model approval | RF2.5.20, AC8.6 | Select compatible strategy without approved model. | Operation remains `NOT_READY` with missing compatible approved/active model blocker. | Critical |
 
-## 8. Prepared for B5 - Training, Validation, Backtest, Approval
+## 8. Executable Now - B5 Training, Validation, Backtest, Approval
 
 | ID | Scenario | Requirements | Steps | Expected Result | Severity |
 | --- | --- | --- | --- | --- | --- |
@@ -119,6 +120,41 @@ Evidence:
 | QA-B5-007 | Approval succeeds only with matching evidence | RF1.12, AC8.6 | Approve model that passes thresholds and metadata checks. | Status becomes `APPROVED`; approval timestamp/event is persisted. | High |
 | QA-B5-008 | Corrupt or missing artifact cannot be approved/loaded | RF2.3, RNF5.11 | Delete/corrupt artifact after metadata exists. | Approval/loading fails safe with clear operator evidence. | Critical |
 | QA-B5-009 | Feature schema mismatch blocks model compatibility | DR6.7, RF2.2 | Change live feature schema after training. | Model is not considered compatible for operation. | Critical |
+
+Current B5 automated coverage:
+
+- `tests/test_model_training.py::test_training_creates_backtested_model_with_temporal_evidence`
+  - validates chronological training/holdout separation;
+  - validates walk-forward validation boundaries;
+  - validates strategy/model-role/feature-schema traceability;
+  - validates persisted walk-forward windows and backtest trades;
+  - validates persisted backtested model metrics and artifact file.
+- `tests/test_model_training.py::test_model_approval_is_blocked_until_thresholds_pass`
+  - validates approval threshold blocking for weak metrics.
+- `tests/test_model_training.py::test_model_approval_succeeds_with_valid_artifact_and_metrics`
+  - validates positive approval path, `APPROVED` status, and approval timestamp.
+- `tests/test_model_training.py::test_model_approval_is_blocked_when_artifact_is_missing_or_corrupt`
+  - validates approval blocking for missing artifact and invalid JSON artifact.
+
+Current B5 verification evidence:
+
+```bash
+cd backend
+uv run pytest
+uv run ruff check .
+SMART_TRADE_DATABASE_URL=sqlite+pysqlite:////tmp/smart_trade_b5_migration.db uv run alembic upgrade head
+SMART_TRADE_DATABASE_URL=sqlite+pysqlite:////tmp/smart_trade_b5_migration.db uv run alembic current
+uv run --group training python -c "import xgboost; print(xgboost.__version__)"
+
+npm --prefix frontend run build
+```
+
+Results:
+
+- Backend: `14 passed`, ruff `All checks passed`.
+- Alembic: upgraded to `20260614_0003 (head)`.
+- XGBoost import: `3.2.0`.
+- Frontend: production build succeeded with known warning-level budgets.
 
 ## 9. Prepared for B6 - Paper Inference and Strategy Runtime
 
@@ -185,13 +221,13 @@ Minimum smoke expectations through B4:
 - Frontend returns HTTP 200.
 - Default strategy is registered.
 - Operation is not ready until a compatible selected strategy and approved/active model exist.
-- With selected B4 strategy but no approved/active model, blocker remains `No approved or active model.`
+- With selected B4 strategy but no approved/active model, blocker remains for missing compatible approved/active model evidence.
 
 ## 13. Current Residual Risks
 
-- B4 strategy selection is implemented, but B5 model training and approval gates are not yet implemented.
-- Operation remains intentionally blocked without approved/active model evidence.
-- B3 feature no-look-ahead behavior has deterministic coverage but should be expanded with explicit boundary fixtures before B5.
+- B5 training and approval gates are implemented, including artifact existence/JSON integrity checks, but the runtime inference loader and paper operation loop are not implemented until B6.
+- Operation remains intentionally blocked without compatible approved/active model evidence.
+- B3 feature no-look-ahead behavior has deterministic coverage but should be expanded with explicit boundary fixtures before B6.
 - Frontend selection controls and strategy parameter editing are not implemented in B4; selection is API/command mediated.
 - Live readiness and live execution must remain untested with real capital until B6/B7 evidence is approved.
 
@@ -218,7 +254,7 @@ Result summary:
 
 - Passed: 20
 - Failed: 0
-- Skipped/not executed in Playwright: B5-B8 future scenarios and selected B0-B4 scenarios that require infrastructure fault injection, exchange variability, or service-level runtime-context overrides.
+- Skipped/not executed in Playwright: B6-B8 future scenarios and selected B0-B5 scenarios that require infrastructure fault injection, exchange variability, or service-level runtime-context overrides.
 
 Executed scenarios:
 
@@ -250,21 +286,22 @@ Not executed in this Playwright run:
 - QA-B0-002: DB unavailable/failure injection should be run as a process-startup fault test.
 - QA-B2-004: partial empty-state coverage remains from backend API tests; full UI empty-registry state is superseded by B4 startup strategy registration.
 - QA-B3-001, QA-B3-002, QA-B3-003: covered by existing backend automated tests and previous smoke; not repeated in Playwright to avoid external public exchange variability.
-- QA-B3-004: should be expanded as deterministic service-level fixture before B5.
+- QA-B3-004: should be expanded as deterministic service-level fixture before B6.
 - QA-B3-006, QA-B3-007: require exchange adapter fault injection and credential-environment assertions.
 - QA-B4-006: requires either multiple compatible strategy fixtures or DB-level assertion of deselection history.
 - QA-B4-008: requires service-level runtime-context override for non-spot/non-long-only/non-`1m` compatibility.
-- B5-B8 scenarios: pending future implementation.
+- B5 UI scenarios were not rerun in Playwright after implementation; current B5 evidence is backend automated tests, migration checks, XGBoost import, and Angular production build.
+- B6-B8 scenarios: pending future implementation.
 
 ## 15. Review Checklist for Agentic Architect
 
 - Confirm scenario coverage matches MVP scope and does not introduce out-of-scope trading behavior.
-- Confirm B5-B8 planned scenarios are acceptable as future gate criteria.
-- Confirm whether QA should now implement additional automated tests for B3 no-look-ahead and B4 parameter rejection before B5 begins.
+- Confirm B6-B8 planned scenarios are acceptable as future gate criteria.
+- Confirm whether QA should now implement additional Playwright coverage for B5 model evidence views before B6 begins.
 
 ## 16. Audit
 
 - Generated by: @qa.eng
-- Action: Created QA scenario matrix for implemented B0-B4 and planned B5-B8 safety gates.
+- Action: Updated QA scenario matrix for implemented B0-B5 and planned B6-B8 safety gates.
 - Date: 2026-06-14
 - Review status: Pending Agentic Architect review.

@@ -193,7 +193,7 @@ h1 {
 }
 
 .training-grid {
-  grid-template-columns: minmax(0, 1.4fr) minmax(300px, 0.8fr);
+  grid-template-columns: minmax(0, 1.35fr) repeat(2, minmax(280px, 0.75fr));
 }
 
 .side-stack {

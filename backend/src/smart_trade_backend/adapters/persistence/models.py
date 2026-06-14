@@ -117,6 +117,72 @@ class ModelRegistryRecord(TimestampMixin, Base):
     )
 
 
+class ModelTrainingRunRecord(TimestampMixin, Base):
+    __tablename__ = "model_training_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    model_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    model_role: Mapped[str] = mapped_column(String(128), nullable=False)
+    strategy_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    strategy_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    feature_schema_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    training_rows: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    holdout_rows: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    metrics: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    error_message: Mapped[str | None] = mapped_column(Text)
+
+    __table_args__ = (
+        Index("ix_model_training_runs_status", "status"),
+        Index("ix_model_training_runs_model_role", "strategy_id", "strategy_version", "model_role"),
+    )
+
+
+class WalkForwardWindowRecord(TimestampMixin, Base):
+    __tablename__ = "walk_forward_windows"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    model_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    window_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    train_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    train_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    validation_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    validation_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    precision_class_1: Mapped[Decimal] = mapped_column(Numeric(10, 8), nullable=False)
+    predicted_positive_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    actual_positive_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    acceptable: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    metrics: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+
+    __table_args__ = (
+        UniqueConstraint("model_id", "window_index", name="uq_walk_forward_model_window"),
+        Index("ix_walk_forward_windows_model_id", "model_id"),
+    )
+
+
+class BacktestTradeRecord(TimestampMixin, Base):
+    __tablename__ = "backtest_trades"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    model_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    trade_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    entry_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    exit_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    entry_price: Mapped[Decimal] = mapped_column(Numeric(28, 12), nullable=False)
+    exit_price: Mapped[Decimal] = mapped_column(Numeric(28, 12), nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(28, 12), nullable=False)
+    pnl: Mapped[Decimal] = mapped_column(Numeric(28, 12), nullable=False)
+    pnl_pct: Mapped[Decimal] = mapped_column(Numeric(18, 10), nullable=False)
+    exit_reason: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("model_id", "trade_index", name="uq_backtest_trades_model_index"),
+        Index("ix_backtest_trades_model_id", "model_id"),
+    )
+
+
 class CandleRecord(TimestampMixin, Base):
     __tablename__ = "candles"
 

@@ -260,3 +260,60 @@ Result:
 ## 4. Intentional Non-Scope
 
 B4 frontend did not implement strategy selection controls or parameter editing. Selection remains available through backend API/command contract for this increment.
+
+---
+
+# B5 Frontend Update - Model Evidence Visibility
+
+Status: Draft for Agentic Architect review  
+Persona: @frontend.eng  
+Date: 2026-06-14
+
+## 1. Scope Completed
+
+B5 updated the operational console to expose backend model-training and approval evidence.
+
+Implemented:
+
+- Extended the typed Angular contracts with:
+  - model metrics and temporal windows;
+  - model parameters;
+  - `GET /api/models/training-runs`.
+- Updated the Model Registry table to show:
+  - precision class 1;
+  - trade count;
+  - net PnL;
+  - holdout start;
+  - richer status severity.
+- Updated the Training view to show:
+  - acceptable walk-forward windows;
+  - out-of-sample trade count and net PnL;
+  - latest model ID;
+  - precision and profit factor;
+  - approval failure evidence;
+  - latest training run status, train/holdout row counts, model role, and completion time.
+
+## 2. Documentation Consulted
+
+Context7 was consulted for Angular typed `HttpClient` service and standalone component/template patterns.
+
+PrimeNG MCP was consulted for:
+
+- `Table`, used for the expanded Model Registry evidence table.
+
+## 3. Verification
+
+Executed successfully:
+
+```bash
+npm --prefix frontend run build
+```
+
+Result:
+
+- Angular production build completed successfully.
+- Remaining warnings: initial bundle exceeds the 500 kB warning budget and root component style exceeds the 4 kB warning budget; both remain below error budgets.
+
+## 4. Intentional Non-Scope
+
+B5 frontend did not add buttons to start training or approve models. Those write paths remain backend-mediated API/command contracts for this increment.

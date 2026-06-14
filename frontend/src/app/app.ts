@@ -116,6 +116,12 @@ export class App implements OnInit {
     }
     return 'Features ready';
   });
+  protected readonly latestTrainingRun = computed(() => {
+    return this.readModels()?.trainingRuns.items[0] ?? null;
+  });
+  protected readonly latestModel = computed(() => {
+    return this.readModels()?.models.items[0] ?? null;
+  });
 
   ngOnInit(): void {
     this.refresh();
@@ -140,6 +146,17 @@ export class App implements OnInit {
 
   protected selectTab(tabId: string): void {
     this.activeTab = tabId;
+  }
+
+  protected modelMetric(key: string): string {
+    const value = this.latestModel()?.metrics[key];
+    if (value === null || value === undefined || value === '') {
+      return 'Unavailable';
+    }
+    if (typeof value === 'number') {
+      return Number.isInteger(value) ? String(value) : value.toFixed(4);
+    }
+    return String(value);
   }
 
   private refreshReadModels(): void {

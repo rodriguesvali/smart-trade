@@ -60,12 +60,37 @@ export interface ModelSummary {
   status: string;
   artifact_uri: string | null;
   metrics: Record<string, unknown>;
+  parameters: Record<string, unknown>;
+  training_window_start: string | null;
+  training_window_end: string | null;
+  holdout_start: string | null;
+  holdout_end: string | null;
   approved_at: string | null;
   created_at: string;
 }
 
 export interface ModelsResponse {
   items: ModelSummary[];
+}
+
+export interface ModelTrainingRunSummary {
+  id: number;
+  model_id: string;
+  model_role: string;
+  strategy_id: string;
+  strategy_version: string;
+  feature_schema_id: string;
+  status: string;
+  started_at: string;
+  completed_at: string | null;
+  training_rows: number;
+  holdout_rows: number;
+  metrics: Record<string, unknown>;
+  error_message: string | null;
+}
+
+export interface ModelTrainingRunsResponse {
+  items: ModelTrainingRunSummary[];
 }
 
 export interface OperationStatus {
@@ -145,6 +170,7 @@ export interface OperatorReadModels {
   operation: OperationStatus;
   events: EventsResponse;
   marketData: MarketDataStatus;
+  trainingRuns: ModelTrainingRunsResponse;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -163,6 +189,7 @@ export class OperatorApi {
       operation: this.http.get<OperationStatus>('/api/operation/status'),
       events: this.http.get<EventsResponse>(`/api/events?limit=${eventLimit}`),
       marketData: this.http.get<MarketDataStatus>('/api/data/status'),
+      trainingRuns: this.http.get<ModelTrainingRunsResponse>('/api/models/training-runs'),
     });
   }
 }

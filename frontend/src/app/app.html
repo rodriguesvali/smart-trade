@@ -37,7 +37,7 @@
   <section class="workspace">
     <header class="topbar">
       <div class="page-title">
-        <p class="eyebrow">Build B2 operational console</p>
+        <p class="eyebrow">Build B5 operational console</p>
         <h1>{{ marketLabel() }}</h1>
         <span>Spot long-only MVP, one selected strategy, one open position.</span>
       </div>
@@ -228,12 +228,16 @@
               <article>
                 <i class="pi pi-sitemap" aria-hidden="true"></i>
                 <strong>Walk-forward validation</strong>
-                <span>Unavailable until B5 training and validation APIs are implemented.</span>
+                <span>
+                  {{ latestModel() ? modelMetric('acceptable_walk_forward_windows') + ' acceptable windows' : 'Awaiting first B5 model run.' }}
+                </span>
               </article>
               <article>
                 <i class="pi pi-chart-bar" aria-hidden="true"></i>
                 <strong>Out-of-sample backtest</strong>
-                <span>Unavailable until B5 backtest APIs are implemented.</span>
+                <span>
+                  {{ latestModel() ? modelMetric('trade_count') + ' trades, net PnL ' + modelMetric('net_pnl') : 'Awaiting first B5 backtest.' }}
+                </span>
               </article>
             </div>
           </p-card>
@@ -252,7 +256,48 @@
                 <dt>Selected strategy</dt>
                 <dd>{{ selectedStrategy()?.name || 'None' }}</dd>
               </div>
+              <div>
+                <dt>Latest model</dt>
+                <dd>{{ latestModel()?.model_id || 'None' }}</dd>
+              </div>
+              <div>
+                <dt>Precision class 1</dt>
+                <dd>{{ modelMetric('precision_class_1') }}</dd>
+              </div>
+              <div>
+                <dt>Profit factor</dt>
+                <dd>{{ modelMetric('profit_factor') }}</dd>
+              </div>
+              <div>
+                <dt>Approval failures</dt>
+                <dd>{{ latestModel()?.metrics?.['approval_failures'] || 'Unavailable' }}</dd>
+              </div>
             </dl>
+          </p-card>
+
+          <p-card header="Latest Training Run">
+            @if (latestTrainingRun(); as run) {
+              <dl>
+                <div>
+                  <dt>Status</dt>
+                  <dd><p-tag [severity]="run.status === 'COMPLETED' ? 'success' : run.status === 'FAILED' ? 'danger' : 'info'" [value]="run.status" /></dd>
+                </div>
+                <div>
+                  <dt>Rows</dt>
+                  <dd>{{ run.training_rows }} train / {{ run.holdout_rows }} holdout</dd>
+                </div>
+                <div>
+                  <dt>Model role</dt>
+                  <dd>{{ run.model_role }}</dd>
+                </div>
+                <div>
+                  <dt>Completed</dt>
+                  <dd>{{ run.completed_at ? (run.completed_at | date:'short') : 'Running' }}</dd>
+                </div>
+              </dl>
+            } @else {
+              <p class="empty-copy">No training run has been recorded.</p>
+            }
           </p-card>
         </section>
       }
