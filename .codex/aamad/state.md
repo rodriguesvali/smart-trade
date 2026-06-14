@@ -14,7 +14,7 @@ Frontend stack: Angular + PrimeNG.
 
 ## Current Stage
 
-Define phase completed and approved by the Agentic Architect on 2026-06-14. Build phase B0 setup was completed and approved by the Agentic Architect on 2026-06-14. Build phase B1 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B2 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B3 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B4 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B5 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B6 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B7 was completed and approved by the Agentic Architect on 2026-06-14. QA scenario planning for B0-B8 has been updated with B7 evidence and is pending Agentic Architect review.
+Define phase completed and approved by the Agentic Architect on 2026-06-14. Build phase B0 setup was completed and approved by the Agentic Architect on 2026-06-14. Build phase B1 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B2 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B3 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B4 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B5 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B6 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B7 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B8 live spot execution was completed and approved by the Agentic Architect on 2026-06-14. Deliver phase operations runbook has been drafted and is pending Agentic Architect review. QA scenario planning for B0-B8 has been updated with B8 evidence and remains pending Agentic Architect review.
 
 AAMAD files generated from the upstream IDE format were adapted into `.codex/aamad/`. AAMAD Flow should use only the Codex-local files in this repository.
 
@@ -41,7 +41,8 @@ AAMAD files generated from the upstream IDE format were adapted into `.codex/aam
 ## Pending Artifacts
 
 - `project-context/2.build/qa.md`
+- `project-context/3.deliver/operations-runbook.md`
 
 ## Review Gate
 
-B7 gate has been approved by the Agentic Architect. B8 may begin when the Agentic Architect explicitly directs the next Build increment. QA scenario planning remains pending review.
+Deliver phase operations runbook is pending Agentic Architect review. QA scenario planning remains pending review. Do not advance to another Deliver artifact until the Architect explicitly approves, requests changes, or redirects.

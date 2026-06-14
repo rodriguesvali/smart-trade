@@ -281,6 +281,27 @@ class LiveReadinessEnableResponse(BaseModel):
     review: LiveReadinessReviewSummary
 
 
+class LiveOrderCreate(BaseModel):
+    side: str = Field(pattern="^(BUY|SELL)$")
+    idempotency_key: str = Field(min_length=1, max_length=80, pattern="^[A-Za-z0-9_-]+$")
+    requested_by: str = Field(default="operator", min_length=1, max_length=128)
+    quote_amount_usd: Decimal | None = Field(default=None, gt=0)
+
+
+class LiveOrderResponse(BaseModel):
+    order: PaperOrderSummary
+    duplicate: bool
+
+
+class LiveStatusResponse(BaseModel):
+    live_enabled_by_config: bool
+    manual_readiness_enabled: bool
+    pending_order_count: int
+    open_position: PaperPositionSummary | None
+    recent_orders: list[PaperOrderSummary]
+    latest_readiness_review: LiveReadinessReviewSummary | None
+
+
 class OperationalEvent(BaseModel):
     id: int
     event_type: str

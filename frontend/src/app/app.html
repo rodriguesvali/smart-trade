@@ -200,6 +200,31 @@
               }
             </p-card>
 
+            <p-card header="Live Execution">
+              <div class="readiness-header">
+                <p-tag [severity]="liveExecutionSeverity()" [value]="liveExecutionLabel()" />
+                <span>{{ readModels()?.live?.pending_order_count ?? 0 }} pending</span>
+              </div>
+              <dl>
+                <div>
+                  <dt>Config gate</dt>
+                  <dd>{{ readModels()?.live?.live_enabled_by_config ? 'Enabled' : 'Disabled' }}</dd>
+                </div>
+                <div>
+                  <dt>Manual gate</dt>
+                  <dd>{{ readModels()?.live?.manual_readiness_enabled ? 'Enabled' : 'Blocked' }}</dd>
+                </div>
+                <div>
+                  <dt>Live position</dt>
+                  <dd>{{ readModels()?.live?.open_position?.status || 'FLAT' }}</dd>
+                </div>
+                <div>
+                  <dt>Latest live order</dt>
+                  <dd>{{ latestLiveOrder()?.side || 'None' }} {{ latestLiveOrder()?.status || '' }}</dd>
+                </div>
+              </dl>
+            </p-card>
+
             <p-card header="Configuration">
               <dl>
                 <div>

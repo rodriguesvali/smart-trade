@@ -814,3 +814,85 @@ B7 did not implement:
 - live restart reconciliation.
 
 Those remain B8 scope.
+
+---
+
+# B8 Backend - Live Spot Execution
+
+Status: Draft for Agentic Architect review  
+Persona: @backend.eng  
+Date: 2026-06-14  
+Source artifacts: `project-context/1.define/prd.md`, `project-context/1.define/sad.md`, `project-context/2.build/build-plan.md`, `project-context/2.build/backend.md`
+
+## 1. Scope Completed
+
+B8 implemented live spot execution infrastructure behind explicit safety gates. It does not perform any real exchange call unless live env flags, acknowledgement, credentials, manual readiness enablement, strategy/model gates, exchange validation, balance checks, and idempotency checks pass.
+
+Implemented:
+
+- Live execution application service with:
+  - `allow_live_trading` config gate;
+  - explicit `I_UNDERSTAND_LIVE_RISK` acknowledgement gate;
+  - exchange credential presence validation without secret echoing;
+  - latest `READY` live-readiness review requirement;
+  - selected strategy and compatible approved/active model requirement;
+  - one-position/no-scaling authorization for long-only spot;
+  - exchange spot/active market, min/max cost/amount, taker fee-rate, and balance checks;
+  - local idempotency through deterministic `client_order_id`;
+  - restart-safe blocking when unreconciled live orders exist.
+- CCXT private Bybit spot adapter isolated under `adapters/exchange/ccxt_private.py`.
+- Live order persistence using existing records:
+  - `strategy_decisions`;
+  - `orders`;
+  - `fills`;
+  - `positions`.
+- Backend API contracts:
+  - `GET /api/live/status`;
+  - `POST /api/live/orders`.
+- `START_LIVE` command handling that routes through the same executor and fails auditably.
+- Environment-only live configuration placeholders in `backend/.env.example`.
+
+## 2. Documentation Consulted
+
+Context7 was consulted before backend implementation:
+
+- CCXT `/ccxt/ccxt`: Bybit spot `defaultType=spot`, `load_markets`, `fetch_balance`, `create_order`, `create_market_sell_order`, `clientOrderId`, market buy quote-cost behavior through `createMarketBuyOrderRequiresPrice=false`, and market metadata/precision/limit patterns.
+
+SQLAlchemy and FastAPI documentation consulted in previous increments remain applicable for persistence and response-model contracts.
+
+## 3. Verification
+
+Executed successfully:
+
+```bash
+cd backend
+uv run ruff check .
+uv run pytest
+```
+
+Result:
+
+- `27 passed`.
+- Existing FastAPI/Starlette TestClient deprecation warning remains unchanged.
+- Ruff returned `All checks passed.`
+
+New B8 tests:
+
+- `tests/test_live_execution.py::test_live_execution_blocks_missing_credentials_without_secret_exposure`
+- `tests/test_live_execution.py::test_live_execution_validates_exchange_limits_before_private_order`
+- `tests/test_live_execution.py::test_live_execution_authorized_buy_persists_order_fill_and_position`
+- `tests/test_live_execution.py::test_live_execution_authorized_sell_closes_open_position`
+- `tests/test_live_execution.py::test_live_execution_exchange_error_preserves_consistent_state`
+- `tests/test_live_execution.py::test_live_execution_idempotency_prevents_duplicate_order_submission`
+- `tests/test_live_execution.py::test_live_execution_blocks_new_order_when_pending_live_order_needs_reconciliation`
+
+## 4. Intentional Safety Boundary
+
+B8 tests use a fake exchange adapter only. No real credentials, live Bybit private endpoint, sandbox order, or real-capital order was used.
+
+Live execution remains blocked by default because:
+
+- `SMART_TRADE_ALLOW_LIVE_TRADING=false`;
+- `SMART_TRADE_LIVE_TRADING_ACK` is empty;
+- exchange credentials are empty;
+- manual readiness must be enabled by a prior B7 `READY` review.

@@ -410,3 +410,49 @@ Result:
 ## 4. Intentional Non-Scope
 
 B7 frontend did not add a live-enable button. Manual readiness enablement remains backend-mediated through API/command contracts.
+
+---
+
+# B8 Frontend Update - Live Execution Evidence
+
+Status: Draft for Agentic Architect review  
+Persona: @frontend.eng  
+Date: 2026-06-14
+
+## 1. Scope Completed
+
+B8 updated the operational console to show backend-mediated live execution state without exposing execution controls or credentials.
+
+Implemented:
+
+- Extended typed Angular contracts with `GET /api/live/status`.
+- Added live execution read model to the dashboard aggregate load.
+- Updated the Operation view to show:
+  - live config gate state;
+  - manual readiness gate state;
+  - pending live order count;
+  - live position state;
+  - latest live order side/status.
+
+## 2. Documentation Consulted
+
+Context7 was consulted for Angular typed `HttpClient` service usage, `inject`, and signal/template read patterns.
+
+PrimeNG MCP was consulted for `Tag`; B8 reused existing PrimeNG card/tag primitives and did not add a new component family.
+
+## 3. Verification
+
+Executed successfully:
+
+```bash
+npm --prefix frontend run build
+```
+
+Result:
+
+- Angular production build completed successfully.
+- Remaining warnings: initial bundle exceeds the 500 kB warning budget and root component style exceeds the 4 kB warning budget; both remain below error budgets.
+
+## 4. Intentional Non-Scope
+
+B8 frontend did not add a live order button, credential fields, or exchange/private API access. Live execution remains backend-mediated only.

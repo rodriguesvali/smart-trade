@@ -128,11 +128,37 @@ export class App implements OnInit {
   protected readonly latestPaperOrder = computed(() => {
     return this.readModels()?.paper.recent_orders[0] ?? null;
   });
+  protected readonly latestLiveOrder = computed(() => {
+    return this.readModels()?.live.recent_orders[0] ?? null;
+  });
   protected readonly liveReadinessLabel = computed(() => {
     return this.readModels()?.liveReadiness.ready ? 'READY' : 'BLOCKED';
   });
   protected readonly liveReadinessSeverity = computed(() => {
     return this.readModels()?.liveReadiness.ready ? 'success' : 'warn';
+  });
+  protected readonly liveExecutionLabel = computed(() => {
+    const live = this.readModels()?.live;
+    if (!live?.live_enabled_by_config) {
+      return 'CONFIG BLOCKED';
+    }
+    if (!live.manual_readiness_enabled) {
+      return 'READINESS BLOCKED';
+    }
+    if (live.pending_order_count > 0) {
+      return 'RECONCILE';
+    }
+    return 'ARMED';
+  });
+  protected readonly liveExecutionSeverity = computed(() => {
+    const live = this.readModels()?.live;
+    if (!live?.live_enabled_by_config || !live.manual_readiness_enabled) {
+      return 'warn';
+    }
+    if (live.pending_order_count > 0) {
+      return 'danger';
+    }
+    return 'success';
   });
 
   ngOnInit(): void {

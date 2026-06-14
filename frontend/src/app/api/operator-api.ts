@@ -189,6 +189,15 @@ export interface LiveReadinessStatusResponse {
   latest_review: LiveReadinessReviewSummary | null;
 }
 
+export interface LiveStatusResponse {
+  live_enabled_by_config: boolean;
+  manual_readiness_enabled: boolean;
+  pending_order_count: number;
+  open_position: PaperPositionSummary | null;
+  recent_orders: PaperOrderSummary[];
+  latest_readiness_review: LiveReadinessReviewSummary | null;
+}
+
 export interface OperationalEvent {
   id: number;
   event_type: string;
@@ -256,6 +265,7 @@ export interface OperatorReadModels {
   trainingRuns: ModelTrainingRunsResponse;
   paper: PaperStatusResponse;
   liveReadiness: LiveReadinessStatusResponse;
+  live: LiveStatusResponse;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -277,6 +287,7 @@ export class OperatorApi {
       trainingRuns: this.http.get<ModelTrainingRunsResponse>('/api/models/training-runs'),
       paper: this.http.get<PaperStatusResponse>('/api/paper/status'),
       liveReadiness: this.http.get<LiveReadinessStatusResponse>('/api/live-readiness/status'),
+      live: this.http.get<LiveStatusResponse>('/api/live/status'),
     });
   }
 }

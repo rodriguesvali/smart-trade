@@ -29,6 +29,14 @@ class Settings(BaseSettings):
     model_min_acceptable_walk_forward_windows: int = 1
     backtest_fee_rate: float = 0.001
     backtest_slippage_rate: float = 0.0005
+    allow_live_trading: bool = False
+    live_trading_ack: str = ""
+    exchange_api_key: str | None = None
+    exchange_api_secret: str | None = None
+    exchange_api_password: str | None = None
+    live_order_quote_amount_usd: float = 25.0
+    live_max_order_quote_amount_usd: float = 100.0
+    live_max_fee_rate: float = 0.005
 
     model_config = SettingsConfigDict(
         env_file=".env",

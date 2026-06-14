@@ -18,9 +18,12 @@ from smart_trade_backend.api.schemas import (
     EventsResponse,
     FeatureGenerationResponse,
     IngestionRunCreate,
+    LiveOrderCreate,
+    LiveOrderResponse,
     LiveReadinessEnableCreate,
     LiveReadinessEnableResponse,
     LiveReadinessStatusResponse,
+    LiveStatusResponse,
     MarketDataStatus,
     ModelApprovalResponse,
     ModelEvidenceResponse,
@@ -37,6 +40,11 @@ from smart_trade_backend.api.schemas import (
     StrategySummary,
 )
 from smart_trade_backend.application.commands import create_command_request
+from smart_trade_backend.application.live.execution import (
+    LiveExecutionError,
+    execute_live_order,
+    latest_live_status,
+)
 from smart_trade_backend.application.market_data.features import PythonFallbackFeatureCalculator
 from smart_trade_backend.application.market_data.ingestion import (
     collect_historical_candles,
@@ -217,6 +225,27 @@ def post_live_readiness_enable(request: LiveReadinessEnableCreate, session: Sess
         }
     except LiveReadinessError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/live/status", response_model=LiveStatusResponse)
+def get_live_status(session: SessionDep) -> dict:
+    return latest_live_status(session, get_settings())
+
+
+@router.post("/live/orders", response_model=LiveOrderResponse, status_code=201)
+def post_live_order(request: LiveOrderCreate, session: SessionDep) -> dict:
+    try:
+        result = execute_live_order(
+            session,
+            get_settings(),
+            side=request.side,  # type: ignore[arg-type]
+            idempotency_key=request.idempotency_key,
+            requested_by=request.requested_by,
+            quote_amount_usd=request.quote_amount_usd,
+        )
+    except LiveExecutionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"order": result.order, "duplicate": result.duplicate}
 
 
 @router.get("/events", response_model=EventsResponse)

@@ -1,9 +1,11 @@
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy.orm import Session
 
 from smart_trade_backend.adapters.persistence.models import CommandRequestRecord
+from smart_trade_backend.application.live.execution import LiveExecutionError, execute_live_order
 from smart_trade_backend.application.model_training.service import (
     ModelApprovalError,
     approve_model,
@@ -26,6 +28,7 @@ SUPPORTED_COMMANDS = {
     CommandType.APPROVE_MODEL,
     CommandType.START_PAPER,
     CommandType.ENABLE_LIVE,
+    CommandType.START_LIVE,
 }
 
 
@@ -105,6 +108,29 @@ def create_command_request(
                 "live_readiness_review_id": review.id,
                 "status": review.status,
                 "enabled_at": review.enabled_at.isoformat() if review.enabled_at else None,
+            }
+    elif command_type == CommandType.START_LIVE and settings is not None:
+        try:
+            live_result = execute_live_order(
+                session,
+                settings,
+                side=str(payload["side"]).upper(),  # type: ignore[arg-type]
+                idempotency_key=str(payload["idempotency_key"]),
+                requested_by=requested_by,
+                quote_amount_usd=Decimal(str(payload["quote_amount_usd"]))
+                if payload.get("quote_amount_usd") is not None
+                else None,
+            )
+        except (KeyError, TypeError, ValueError, LiveExecutionError) as exc:
+            status = CommandStatus.FAILED
+            result = {"reason": str(exc)}
+        else:
+            status = CommandStatus.COMPLETED
+            result = {
+                "order_id": live_result.order.id,
+                "client_order_id": live_result.order.client_order_id,
+                "status": live_result.order.status,
+                "duplicate": live_result.duplicate,
             }
 
     record = CommandRequestRecord(

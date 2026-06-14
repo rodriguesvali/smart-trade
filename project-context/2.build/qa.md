@@ -234,7 +234,7 @@ Results:
 - Alembic: upgraded to `20260614_0004 (head)`.
 - Frontend: production build succeeded with known warning-level budgets.
 
-## 11. Prepared for B8 - Live Spot Execution
+## 11. B8 - Live Spot Execution
 
 | ID | Scenario | Requirements | Steps | Expected Result | Severity |
 | --- | --- | --- | --- | --- | --- |
@@ -245,6 +245,18 @@ Results:
 | QA-B8-005 | Exchange timeout/rate limit preserves state consistency | RF2.7, AC8.12, RNF5.7 | Mock timeout/rate limit during order submission. | Error is logged, order/position state is not falsely marked filled, retry/reconciliation policy is followed. | Critical |
 | QA-B8-006 | Restart reconciliation prevents duplicate live orders | SAD restart behavior, B8 scope | Restart after submitted/pending exchange order. | Runtime reconciles exchange/order state before any new order. | Critical |
 | QA-B8-007 | Frontend cannot directly execute live trades | RF4.8, RNF5.12 | Inspect frontend bundle and network during live mode. | UI still calls backend commands/read APIs only; no exchange private calls or credentials. | Critical |
+
+Execution status on 2026-06-14:
+
+- QA-B8-001 covered by `tests/test_live_execution.py::test_live_execution_blocks_missing_credentials_without_secret_exposure`.
+- QA-B8-002 covered by `tests/test_live_execution.py::test_live_execution_validates_exchange_limits_before_private_order`.
+- QA-B8-003 covered by `tests/test_live_execution.py::test_live_execution_authorized_buy_persists_order_fill_and_position`.
+- QA-B8-004 covered by `tests/test_live_execution.py::test_live_execution_authorized_sell_closes_open_position`.
+- QA-B8-005 covered by `tests/test_live_execution.py::test_live_execution_exchange_error_preserves_consistent_state`.
+- QA-B8-006 covered by `tests/test_live_execution.py::test_live_execution_idempotency_prevents_duplicate_order_submission` and `tests/test_live_execution.py::test_live_execution_blocks_new_order_when_pending_live_order_needs_reconciliation`.
+- QA-B8-007 covered by frontend code review/build evidence: Angular consumes `GET /api/live/status` only; no exchange credentials, CCXT/private exchange client, or direct live-order UI control was added.
+
+Boundary: B8 validation used fake exchange adapters only. No real Bybit private endpoint, sandbox order, or real-capital order was executed.
 
 ## 12. Regression Smoke Suite
 
@@ -308,7 +320,7 @@ Result summary:
 
 - Passed: 20
 - Failed: 0
-- Skipped/not executed in Playwright: B8 future scenarios and selected B0-B7 scenarios that require infrastructure fault injection, exchange variability, or service-level runtime-context overrides.
+- Skipped/not executed in Playwright: selected B0-B8 scenarios that require infrastructure fault injection, exchange variability, or service-level runtime-context overrides. B8 safety behavior is covered by backend fake-exchange tests added after this Playwright pass.
 
 Executed scenarios:
 
@@ -340,22 +352,21 @@ Not executed in this Playwright run:
 - QA-B0-002: DB unavailable/failure injection should be run as a process-startup fault test.
 - QA-B2-004: partial empty-state coverage remains from backend API tests; full UI empty-registry state is superseded by B4 startup strategy registration.
 - QA-B3-001, QA-B3-002, QA-B3-003: covered by existing backend automated tests and previous smoke; not repeated in Playwright to avoid external public exchange variability.
-- QA-B3-004: should be expanded as deterministic service-level fixture before B8.
+- QA-B3-004: should be expanded as deterministic service-level fixture before live capital readiness.
 - QA-B3-006, QA-B3-007: require exchange adapter fault injection and credential-environment assertions.
 - QA-B4-006: requires either multiple compatible strategy fixtures or DB-level assertion of deselection history.
 - QA-B4-008: requires service-level runtime-context override for non-spot/non-long-only/non-`1m` compatibility.
-- B5/B6 UI scenarios were not rerun in Playwright after implementation; current evidence is backend automated tests, migration checks where applicable, XGBoost import, and Angular production build.
-- B8 scenarios: pending future implementation.
+- B5/B6/B7/B8 UI scenarios were not rerun in Playwright after implementation; current evidence is backend automated tests, migration checks where applicable, XGBoost import, fake-exchange live execution tests, frontend code review, and Angular production build.
 
 ## 15. Review Checklist for Agentic Architect
 
 - Confirm scenario coverage matches MVP scope and does not introduce out-of-scope trading behavior.
-- Confirm B8 planned scenarios are acceptable as future gate criteria.
-- Confirm whether QA should now implement additional Playwright coverage for B5-B7 model, paper, and readiness evidence views before B8 begins.
+- Confirm B8 fake-exchange coverage is acceptable before any later sandbox/live-capital readiness window.
+- Confirm whether QA should now implement additional Playwright coverage for B5-B8 model, paper, readiness, and live execution evidence views before the next build increment.
 
 ## 16. Audit
 
 - Generated by: @qa.eng
-- Action: Updated QA scenario matrix for implemented B0-B7 and planned B8 safety gates.
+- Action: Updated QA scenario matrix for implemented B0-B8 safety gates.
 - Date: 2026-06-14
 - Review status: Pending Agentic Architect review.
