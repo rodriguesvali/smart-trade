@@ -11,12 +11,12 @@ Database Versioning: Alembic
 
 ## 1. Architecture Philosophy and Principles
 
-The Smart Trade MVP architecture is safety-first, process-isolated, and traceable by default. The system must prevent live or paper strategy execution unless the configured model, strategy, asset, timeframe, and operational parameters pass explicit compatibility and approval gates.
+The Smart Trade MVP architecture is safety-first, process-isolated, and traceable by default. The system must prevent live or paper strategy execution unless the configured strategy, all strategy-required model roles, asset, timeframe, and operational parameters pass explicit compatibility and approval gates.
 
 Core principles:
 
 - Safety-first operational design: invalid configuration, missing credentials, incompatible model metadata, unsupported strategy compatibility, exchange validation failures, or persistence failures must stop operational startup or block the unsafe action.
-- Approved-model gating: the execution process may use only a model with status `APPROVED` or `ACTIVE` that matches the configured asset, timeframe, feature schema, selected strategy ID/version, and strategy parameters.
+- Approved-model gating: the execution process may use only models with status `APPROVED` or `ACTIVE` that match the configured asset, timeframe, feature schema, selected strategy ID/version, declared model role, and strategy parameters.
 - Process isolation: training, inference/execution, Python backend/API, Angular frontend, MySQL, model artifacts, and logs are separate runtime concerns with explicit boundaries.
 - Observable by default: training, validation, backtest, model approval, inference, strategy decisions, orders, fills, positions, errors, and operator commands must be persisted or logged.
 - Configuration outside code: exchange, symbol, timeframe, strategy selection, risk parameters, model paths, credentials, mode, and approval criteria are externally configured.
@@ -55,7 +55,7 @@ MVP constraints derived from the approved PRD:
 - Persistence: MySQL for structured state; Alembic for schema versioning.
 - Frontend restrictions: no direct database access, model artifact access, log-file access, exchange API access, or secret access.
 
-The architecture must support paper mode before live readiness. Live operation remains gated by approved model, selected compatible strategy, valid exchange configuration, externalized credentials, and operator-controlled mode configuration.
+The architecture must support paper mode before live readiness. Live operation remains gated by all strategy-required approved models, selected compatible strategy, valid exchange configuration, externalized credentials, and operator-controlled mode configuration.
 
 ## 4. Logical View
 
@@ -106,11 +106,11 @@ The frontend reaches them only through backend APIs/read models.
 
 - Training Pipeline: collects historical M1 candles, generates features, separates holdout data, trains XGBoost candidates, validates with walk-forward analysis, runs selected-strategy backtests, and persists model metadata.
 - Feature Engineering: produces reproducible feature sets from candle and volume data for training, validation, backtest, and live inference. TA-Lib is the selected MVP technical indicator library and must be encapsulated behind feature-engineering application/domain boundaries.
-- Model Registry: stores model metadata, status lifecycle, feature schema, strategy identity, approval evidence, artifact path, and compatibility fields.
+- Model Registry: stores model metadata, status lifecycle, feature schema, strategy identity, model role, approval evidence, artifact path, and compatibility fields.
 - Model Artifact Store: stores serialized `.joblib` or `.pkl` model files and associated metadata files where required.
-- Strategy Registry: exposes registered strategy metadata: stable ID, version, name, supported market type, supported direction, required parameters, required features, model requirements, and operational status.
+- Strategy Registry: exposes registered strategy metadata: stable ID, version, name, supported market type, supported direction, required parameters, required features, model role requirements, and operational status.
 - Selected Strategy Engine: runs one configured strategy at a time for the MVP, initially the RSI/IFR oversold plus XGBoost binary confirmation strategy.
-- Inference Engine: loads compatible approved/active model artifacts and produces binary signals.
+- Inference Engine: loads compatible approved/active model artifacts for each required strategy model role and produces role-scoped binary signals.
 - Execution Adapter: isolates CCXT public/private exchange integration from domain/application logic.
 - Persistence Layer: owns MySQL reads/writes for candles, features, model registry, strategy registry, validation/backtest records, decisions, orders, fills, positions, equity snapshots, and command records.
 - Python Backend/API: mediates frontend reads and approved commands such as manual retraining request.
@@ -207,8 +207,9 @@ Required entity areas:
 
 ### Data Consistency Rules
 
-- Every model-related operational record must include model ID when a model participated in the decision.
+- Every model-related operational record must include model ID and model role when a model participated in the decision.
 - Every strategy-related validation, backtest, model, inference, and operational record must include strategy ID and strategy version.
+- Records that use inference must include every participating model ID and model role.
 - Every order/fill record must preserve exchange identifiers and raw response references where practical.
 - Feature schema identifiers must match across model training and live inference.
 - Position state transitions must be appendable/auditable, even if a current-state read model is also maintained.
@@ -233,7 +234,7 @@ The exact transition enforcement can be implemented as application logic and per
 - Feature schema and feature list.
 - Walk-forward validation metrics.
 - Final out-of-sample backtest metrics.
-- Strategy ID/version and strategy parameters used during validation/backtest.
+- Strategy ID/version, model role, and strategy parameters used during validation/backtest.
 - Approval event and approval criteria snapshot.
 - Artifact path and serialization format.
 
@@ -244,17 +245,18 @@ Before activation, the system checks:
 - Exchange and symbol match.
 - M1 timeframe match.
 - Feature schema match.
-- Strategy ID/version match.
+- Strategy ID/version and model role match.
 - Strategy parameters match or are compatible by an approved compatibility rule.
 - Model status is `APPROVED` or `ACTIVE`.
 - Artifact exists and can be loaded.
-- Model output contract is binary.
+- Model output contract is binary for each required binary model role.
 
 ### Traceability
 
 Every inference record includes:
 
 - Model ID.
+- Model role.
 - Strategy ID/version.
 - Asset/timeframe.
 - Input feature schema/version.
@@ -275,7 +277,7 @@ Loop outline:
 3. Generate live features using the same feature contract as training.
 4. Load or use the already loaded approved/active model.
 5. Run selected strategy evaluation.
-6. If required by strategy, request binary model inference.
+6. If required by strategy, request binary model inference for each declared model role needed by the decision.
 7. Produce a strategy decision.
 8. Submit authorized order through CCXT only when strategy and risk checks allow it.
 9. Persist inference, decision, order, fill, position, and log records.
@@ -287,7 +289,7 @@ The registered default strategy is:
 - Spot long-only.
 - One open position at a time.
 - RSI/IFR oversold condition as the technical entry prerequisite.
-- XGBoost binary signal `1` as entry/continuation confirmation.
+- XGBoost binary signal `1` as entry/continuation confirmation for the default required model role.
 - Mandatory stop loss.
 - Mandatory take profit or configured profit handling.
 - Break-even protection.
@@ -305,19 +307,21 @@ Each registered strategy must declare:
 - Supported direction.
 - Required parameters and defaults.
 - Required features.
-- Model requirements.
+- Model requirements by role.
 - Position constraints.
 - Compatibility with MVP spot long-only rules.
 
-New strategies must be registerable as plugins. Plugin loading and registration must validate the strategy contract, metadata, parameter schema, compatibility declarations, and operational safety constraints before a strategy can be selected.
+New strategies must be registerable as plugins. Plugin loading and registration must validate the strategy contract, metadata, parameter schema, model role requirements, compatibility declarations, and operational safety constraints before a strategy can be selected.
 
-Strategy plugins are Python code-deployed backend plugins, not frontend-uploaded scripts. Each plugin must provide metadata (`id`, `name`, `version`, `description`, `supported_market`, `supported_direction`, `timeframes`, `required_features`, `model_required`), a typed parameter schema with defaults and limits, `validate_config(config)`, `required_features(config)`, `on_candle(context)`, `on_position_update(context)`, `risk_rules(config)`, and `compatibility_check(runtime_context)`. Strategy outputs must use standardized decisions such as `HOLD`, `ENTER_LONG`, `MOVE_STOP`, and `EXIT_POSITION`, with reason, signal/confidence where applicable, and risk updates.
+Strategy plugins are Python code-deployed backend plugins, not frontend-uploaded scripts. Each plugin must provide metadata (`id`, `name`, `version`, `description`, `supported_market`, `supported_direction`, `timeframes`, `required_features`, `model_requirements` by role), a typed parameter schema with defaults and limits, `validate_config(config)`, `required_features(config)`, `required_model_roles(config)`, `on_candle(context)`, `on_position_update(context)`, `risk_rules(config)`, and `compatibility_check(runtime_context)`. Strategy outputs must use standardized decisions such as `HOLD`, `ENTER_LONG`, `MOVE_STOP`, and `EXIT_POSITION`, with reason, signal/confidence where applicable, participating model roles/IDs, and risk updates.
+
+The default MVP strategy uses one required model role for entry/continuation confirmation. The architecture supports future strategies that combine two or more approved models by role, such as entry confirmation, trend filter, volatility regime, or exit confirmation.
 
 ### Fail-Safe Behavior
 
 The execution process must block startup or block action when:
 
-- No compatible approved/active model exists.
+- No compatible approved/active model exists for every required strategy model role.
 - Selected strategy is missing, inactive, or incompatible.
 - Feature schema does not match model metadata.
 - Exchange limits or balance checks fail.
@@ -343,7 +347,7 @@ The execution process must block startup or block action when:
 ### Model Artifact Storage
 
 - Training writes artifacts and metadata.
-- Inference/execution reads artifacts only after model registry compatibility checks pass.
+- Inference/execution reads artifacts only after model registry compatibility checks pass for every required strategy model role.
 - Frontend receives model metadata and metrics through backend APIs only.
 
 ### Log Access
@@ -512,12 +516,12 @@ TA-Lib introduces a native C dependency. Build and deployment definitions must i
 - Consequences: Indicator calculations use a mature native technical-analysis library, but Linux/Docker builds must install and verify the TA-Lib C dependency.
 - PRD traceability: RF1.3, DR6.5.
 
-### Decision 7: Approved Model Compatibility Gate
+### Decision 7: Approved Model Role Compatibility Gate
 
 - Context: Strategy must not run without approved compatible model.
-- Options considered: load latest model; operator-selected file path; registry-compatible model gate.
-- Chosen approach: execution loads only `APPROVED` or `ACTIVE` models that match asset, timeframe, feature schema, strategy ID/version, and parameters.
-- Consequences: reduces model mismatch and accidental live use of invalid artifacts.
+- Options considered: load latest model; operator-selected file path; one global active model; registry-compatible model role gate.
+- Chosen approach: execution loads only `APPROVED` or `ACTIVE` models for every model role declared by the selected strategy, matching asset, timeframe, feature schema, strategy ID/version, model role, and parameters.
+- Consequences: reduces model mismatch and accidental live use of invalid artifacts; future strategies can combine multiple approved models without replacing the execution platform.
 - PRD traceability: RF1.10-RF1.12, RF2.2-RF2.3, AC8.6.
 
 ### Decision 8: CCXT Isolated Behind Execution Adapter
@@ -612,6 +616,7 @@ Explicitly deferred unless later approved:
 - The MVP default strategy is RSI/IFR oversold plus XGBoost binary confirmation.
 - TA-Lib is the selected MVP technical indicator library.
 - Strategy registry is required and new strategies must be registerable as plugins.
+- Strategies may declare one or more model roles. The default MVP strategy declares one model role for entry/continuation confirmation.
 - One selected strategy is active at a time in the MVP.
 - Model approval is manual-only for the MVP.
 - Alembic migrations are executed by the backend startup process before dependent backend/trading processes run, with failure causing fail-fast startup.
@@ -649,7 +654,7 @@ No open architecture questions remain.
 - Paper/live readiness: at least 7 consecutive paper days; at least 30 simulated trades or full 7-day run if fewer signals occur; no unresolved critical failures; consistent state and traceability; manual live enablement.
 - Retention policy: raw candles 180 days; derived features 90 days; validation/backtest, inference, strategy decisions, orders, fills, positions, equity, approvals, and commands at least 365 days; application logs 30 days; critical logs 180 days; approved/active model artifacts indefinitely while relevant; rejected model artifacts 30 days.
 - Frontend authentication: none for MVP.
-- Strategy plugin contract: Python code-deployed backend plugins with metadata, typed parameter schema, validation hooks, feature declarations, candle/position handlers, risk rules, compatibility checks, and standardized decisions.
+- Strategy plugin contract: Python code-deployed backend plugins with metadata, typed parameter schema, validation hooks, feature declarations, model role declarations, candle/position handlers, risk rules, compatibility checks, and standardized decisions.
 - Database: MySQL
 - Database versioning: Alembic
 - Source inputs: `project-context/1.define/prd.md`, `.codex/aamad/templates/sad-template.md`, `.codex/aamad/agents/system-arch.md`, `.codex/aamad/state.md`

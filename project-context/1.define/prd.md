@@ -27,6 +27,7 @@ The MVP is deliberately narrow: one configured asset, one selected strategy acti
 - One selected operational strategy active at a time for the MVP.
 - One open position at a time.
 - XGBoost binary confirmation model.
+- Strategy-declared model requirements by role, allowing a strategy to require one or more approved models for inference confirmation.
 - RSI/IFR as the primary technical entry condition before model confirmation.
 - Training pipeline with historical ingestion, feature engineering, walk-forward validation, and final out-of-sample backtest.
 - Model lifecycle with approval gate before operational use.
@@ -78,28 +79,29 @@ The MVP workflow must be sequential and auditable:
 - RF1.4: The training window must be configurable, with an initial default recommendation of 60 days of M1 data before the final holdout window.
 - RF1.5: The pipeline must reserve a configurable final holdout window, initially recommended as 3 days, and must not use this data for training.
 - RF1.6: The pipeline must run walk-forward validation within the training period to reduce overfitting and look-ahead bias.
-- RF1.7: The pipeline must train an XGBoost candidate model that produces a binary confirmation signal.
-- RF1.8: The pipeline must run an out-of-sample backtest of the selected strategy. For the MVP default strategy, this includes RSI/IFR entry condition, model confirmation, long spot entry, stop loss, take profit, break even, trailing stop, and inference-conditioned profit handling.
+- RF1.7: The pipeline must train XGBoost candidate models that produce binary confirmation signals for declared strategy model roles. The MVP default strategy requires one model role for entry/continuation confirmation.
+- RF1.8: The pipeline must run an out-of-sample backtest of the selected strategy using all model roles declared by that strategy. For the MVP default strategy, this includes RSI/IFR entry condition, model confirmation, long spot entry, stop loss, take profit, break even, trailing stop, and inference-conditioned profit handling.
 - RF1.9: The pipeline must generate at minimum precision for class `1`, trade count, simulated net PnL, profit factor, maximum drawdown, win rate, and longest losing streak.
-- RF1.10: The pipeline must persist each model artifact as `.joblib` or `.pkl` plus metadata including asset, exchange, timeframe, training period, holdout period, feature set, strategy ID, strategy version, strategy parameters, validation metrics, backtest metrics, artifact path, and model status.
+- RF1.10: The pipeline must persist each model artifact as `.joblib` or `.pkl` plus metadata including asset, exchange, timeframe, training period, holdout period, feature set, strategy ID, strategy version, model role, strategy parameters, validation metrics, backtest metrics, artifact path, and model status.
 - RF1.11: The model lifecycle must support `TRAINED`, `VALIDATED`, `APPROVED`, `ACTIVE`, `REJECTED`, `EXPIRED`, and `RETIRED`.
-- RF1.12: The system must prevent operational strategy start unless a matching model is `APPROVED` or `ACTIVE`.
+- RF1.12: The system must prevent operational strategy start unless every model required by the selected strategy's declared model roles has a matching `APPROVED` or `ACTIVE` model.
 
 ### Module 2: Inference and Execution
 
 - RF2.1: The inference loop must align to the M1 cycle and run after the latest candle is expected to be closed, initially targeting second `01` of each minute.
-- RF2.2: The inference service must load only an approved or active model matching the configured exchange, symbol, timeframe, feature set, selected strategy ID, selected strategy version, and strategy parameters.
-- RF2.3: If the approved model is absent, corrupted, incompatible, expired, or mismatched, the system must fail safe and not start operational strategy execution.
-- RF2.4: The inference output must be binary: `1` means favorable confirmation for long entry or long continuation, and `0` means no confirmation.
+- RF2.2: The inference service must load only approved or active models matching the configured exchange, symbol, timeframe, feature set, selected strategy ID, selected strategy version, model role, and strategy parameters.
+- RF2.3: If any model required by the selected strategy is absent, corrupted, incompatible, expired, or mismatched, the system must fail safe and not start operational strategy execution.
+- RF2.4: The inference output for each binary model role must be binary: `1` means favorable confirmation for the role's purpose and `0` means no confirmation.
 - RF2.5: The execution adapter must send authorized spot market buy and sell orders through CCXT private APIs.
-- RF2.6: The execution path must persist inference result, model ID, strategy decision, order request, exchange response, fill data, and resulting position state.
+- RF2.6: The execution path must persist inference results, all participating model IDs and model roles, strategy decision, order request, exchange response, fill data, and resulting position state.
 - RF2.7: The execution module must handle temporary exchange errors, rate limits, timeouts, invalid responses, and rejected orders without losing strategy state consistency.
 
 ### Module 2.5: Strategy and Position Management
 
-- RF2.5.1: The system must provide a strategy registry that lists available strategies by stable ID, name, version, description, supported market type, supported direction, required parameters, required features, model requirements, and operational status.
+- RF2.5.1: The system must provide a strategy registry that lists available strategies by stable ID, name, version, description, supported market type, supported direction, required parameters, required features, model role requirements, and operational status.
 - RF2.5.2: The system must allow new strategies to be implemented and registered for use by the training, validation, backtest, inference, execution, persistence, and frontend layers through a stable strategy contract.
 - RF2.5.2.1: New strategies must be registerable as plugins, subject to strategy contract validation, compatibility checks, and operational safety gates.
+- RF2.5.2.2: A strategy plugin may declare one or more model roles, such as entry confirmation, trend filter, volatility regime, or exit confirmation. Each declared role must map to a compatible approved or active model before the strategy can start.
 - RF2.5.3: The MVP must ship with one registered default strategy based on RSI/IFR oversold detection plus XGBoost binary confirmation.
 - RF2.5.4: The MVP must support only one selected operational strategy active at a time for the configured asset.
 - RF2.5.5: A strategy must not be selectable for operation unless it declares compatibility with spot long-only execution and the configured asset/timeframe requirements.
@@ -116,7 +118,7 @@ The MVP workflow must be sequential and auditable:
 - RF2.5.16: When price has moved favorably and continuation inference changes to `0`, the strategy must realize profit or trigger configured exit behavior.
 - RF2.5.17: The strategy must close a position when stop loss, protected stop, trailing stop, take profit, or configured loss of confirmation condition is met.
 - RF2.5.18: Position state must be explicit, including no position, open position, break-even protected position, trailing-stop position, take-profit triggered position, closing position, and closed position.
-- RF2.5.19: Every strategy decision must be logged with strategy ID, strategy version, strategy parameters, RSI/IFR value where applicable, model signal, model ID, decision, entry price, stop loss, take profit, stop movements, break-even activation, continuation checks, exit action, and exit reason.
+- RF2.5.19: Every strategy decision must be logged with strategy ID, strategy version, strategy parameters, RSI/IFR value where applicable, model signals, model IDs, model roles, decision, entry price, stop loss, take profit, stop movements, break-even activation, continuation checks, exit action, and exit reason.
 - RF2.5.20: Strategy registration must not bypass model approval, exchange validation, position constraints, risk controls, or fail-safe behavior.
 
 ### Module 3: Python Backend/API
@@ -152,7 +154,7 @@ The MVP workflow must be sequential and auditable:
 - RNF5.7: The execution process must be resilient to temporary network, exchange, and persistence errors.
 - RNF5.8: Operational configuration must be externalized, including exchange, symbol, timeframe, selected strategy ID/version, strategy parameters, windows, model path, feature set, approval criteria, RSI/IFR thresholds for the MVP strategy, stop loss, take profit, break even, trailing stop, mode, and credentials.
 - RNF5.9: Model artifacts must be replaceable without code changes when metadata and feature compatibility are satisfied.
-- RNF5.10: Every inference and operational decision must be traceable to a model ID.
+- RNF5.10: Every inference and operational decision must be traceable to every participating model ID and model role.
 - RNF5.11: The system must fail safe when model, configuration, exchange limits, or persistence prerequisites are invalid.
 - RNF5.12: Frontend availability must not be required for strategy execution.
 - RNF5.13: The strategy extension mechanism must preserve domain/application boundaries and must not require changes to CCXT execution adapters, database adapters, or frontend internals for every new strategy.
@@ -162,13 +164,13 @@ The MVP workflow must be sequential and auditable:
 - DR6.1: MySQL is the target database for structured application state.
 - DR6.2: Alembic must version database schema changes.
 - DR6.3: Required entity areas include asset configuration, strategy registry, selected strategy configuration, candles, features, model registry, validation runs, backtest runs, approval events, inference signals, strategy decisions, positions, orders, fills, equity snapshots, operational events, and command requests.
-- DR6.4: Model metadata must record artifact location, model type, version, asset, exchange, timeframe, feature list, training window, holdout window, validation method, metrics, strategy ID, strategy version, strategy parameters, approval status, and timestamps.
+- DR6.4: Model metadata must record artifact location, model type, version, asset, exchange, timeframe, feature list, training window, holdout window, validation method, metrics, strategy ID, strategy version, model role, strategy parameters, approval status, and timestamps.
 - DR6.5: Feature generation must be reproducible between training, validation, backtest, and live inference.
 - DR6.6: Approval thresholds must be configurable and persisted with the model evaluation result.
 - DR6.7: The system must prevent use of a model when the live feature schema differs from the trained feature schema.
 - DR6.8: Model status transitions must be auditable.
 - DR6.9: Strategy registration and strategy selection changes must be auditable.
-- DR6.10: Strategy decisions, validation runs, backtest runs, and operational records must be attributable to strategy ID and strategy version.
+- DR6.10: Strategy decisions, validation runs, backtest runs, and operational records must be attributable to strategy ID, strategy version, model role, and all participating model IDs where model inference was used.
 
 ## 7. User Experience and Operations
 
@@ -195,8 +197,8 @@ Frontend operations must use backend APIs only. Any command that can affect trai
 - AC8.3: Given configured training and holdout windows, the pipeline excludes holdout data from training.
 - AC8.4: Given a candidate model and selected strategy, the pipeline runs walk-forward validation and final out-of-sample strategy backtest.
 - AC8.5: Given validation and backtest results, the system persists model artifact, metadata, metrics, and status.
-- AC8.6: Given no approved or active matching model for the configured asset, timeframe, selected strategy, and strategy parameters, the strategy cannot start.
-- AC8.7: Given an approved matching model, the inference loop can produce minute-aligned binary signals and persist model-linked inference records.
+- AC8.6: Given no approved or active matching model for every required model role for the configured asset, timeframe, selected strategy, and strategy parameters, the strategy cannot start.
+- AC8.7: Given approved matching models for all required strategy model roles, the inference loop can produce minute-aligned binary signals and persist model-linked inference records.
 - AC8.8: Given the MVP default strategy, oversold RSI/IFR, binary signal `1`, sufficient balance, and valid exchange limits, the strategy can open one long spot position.
 - AC8.9: Given an open position, the strategy ignores additional entry signals for position increase.
 - AC8.10: Given an open position, the strategy manages stop loss, take profit, break even, trailing stop, and inference-conditioned exits.
@@ -244,7 +246,8 @@ No open PRD questions remain.
 - Alembic migrations are executed by the backend startup process before dependent backend/trading processes run, with failure causing fail-fast startup.
 - The MVP ships with one default registered strategy, but the product architecture must support adding more registered strategies later.
 - New strategies must be registerable as plugins.
-- Strategy plugins are Python code-deployed backend plugins, not frontend-uploaded scripts. Each plugin must provide metadata (`id`, `name`, `version`, `description`, `supported_market`, `supported_direction`, `timeframes`, `required_features`, `model_required`), a typed parameter schema with defaults and limits, `validate_config(config)`, `required_features(config)`, `on_candle(context)`, `on_position_update(context)`, `risk_rules(config)`, and `compatibility_check(runtime_context)`. Strategy outputs must use standardized decisions such as `HOLD`, `ENTER_LONG`, `MOVE_STOP`, and `EXIT_POSITION`, with reason, signal/confidence where applicable, and risk updates.
+- Strategy plugins are Python code-deployed backend plugins, not frontend-uploaded scripts. Each plugin must provide metadata (`id`, `name`, `version`, `description`, `supported_market`, `supported_direction`, `timeframes`, `required_features`, `model_requirements` by role), a typed parameter schema with defaults and limits, `validate_config(config)`, `required_features(config)`, `required_model_roles(config)`, `on_candle(context)`, `on_position_update(context)`, `risk_rules(config)`, and `compatibility_check(runtime_context)`. Strategy outputs must use standardized decisions such as `HOLD`, `ENTER_LONG`, `MOVE_STOP`, and `EXIT_POSITION`, with reason, signal/confidence where applicable, participating model roles/IDs, and risk updates.
+- The default MVP strategy uses one required model role for entry/continuation confirmation, but the architecture must support future strategies that combine two or more approved models by role for inference confirmation.
 - Only one strategy is selected for operation at a time in the MVP.
 - Derivatives-only data such as open interest and funding rate are optional and not required for spot-only MVP acceptance.
 - Runtime implementation, architecture decisions, project scaffolding, and code generation remain out of scope until this PRD is reviewed and approved.
@@ -252,7 +255,7 @@ No open PRD questions remain.
 ## 12. Audit
 
 - Generated by: @product-mgr
-- Action: Consolidated draft PRD from proposed solution into AAMAD project-context format; revised to require an extensible plugin-based strategy registry while keeping one active MVP strategy; updated charting decision to TradingView Lightweight Charts; set initial exchange to Bybit; set initial MVP asset to Bitcoin with default CCXT spot symbol `BTC/USDT`; set initial operational capital to 1,000 USD; set backend Python version to 3.14; set `uv` as backend dependency manager; set TA-Lib as the MVP technical indicator library; set Bybit fee/slippage assumptions for backtest and paper mode; set model approval to manual-only with minimum approval thresholds; set paper-mode live readiness gate; set retention policy; set no frontend authentication for MVP; set Alembic migration execution to startup; set strategy plugin contract.
+- Action: Consolidated draft PRD from proposed solution into AAMAD project-context format; revised to require an extensible plugin-based strategy registry while keeping one active MVP strategy; added strategy-declared model roles to support one or more approved models per strategy; updated charting decision to TradingView Lightweight Charts; set initial exchange to Bybit; set initial MVP asset to Bitcoin with default CCXT spot symbol `BTC/USDT`; set initial operational capital to 1,000 USD; set backend Python version to 3.14; set `uv` as backend dependency manager; set TA-Lib as the MVP technical indicator library; set Bybit fee/slippage assumptions for backtest and paper mode; set model approval to manual-only with minimum approval thresholds; set paper-mode live readiness gate; set retention policy; set no frontend authentication for MVP; set Alembic migration execution to startup; set strategy plugin contract.
 - Date: 2026-06-14
 - Review status: Approved by Agentic Architect.
 - Handoff gate: PRD approved. Next AAMAD Define step may proceed when requested by the Agentic Architect.
