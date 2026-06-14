@@ -1,51 +1,98 @@
 <main class="app-shell">
   <header class="topbar">
     <div>
-      <p class="eyebrow">Build B0</p>
+      <p class="eyebrow">Build B1</p>
       <h1>{{ title() }}</h1>
     </div>
 
-    <p-tag
-      [severity]="backendStatus() === 'ok' ? 'success' : backendStatus() === 'error' ? 'danger' : 'warn'"
-      [value]="backendLabel()"
-    />
+    <div class="topbar-actions">
+      <p-tag
+        [severity]="backendStatus() === 'ok' ? 'success' : backendStatus() === 'error' ? 'danger' : 'warn'"
+        [value]="backendLabel()"
+      />
+      <p-button
+        icon="pi pi-refresh"
+        ariaLabel="Refresh"
+        [loading]="loadingReadModels()"
+        (onClick)="refresh()"
+      />
+    </div>
   </header>
 
+  @if (readModelError()) {
+    <section class="notice">
+      <strong>Backend API unavailable.</strong>
+      <span>Operational read models could not be loaded.</span>
+    </section>
+  }
+
   <section class="status-grid">
-    <p-card header="Runtime">
-      <dl>
-        <div>
-          <dt>Backend</dt>
-          <dd>Python 3.14, FastAPI, uv</dd>
-        </div>
-        <div>
-          <dt>Frontend</dt>
-          <dd>Angular, PrimeNG, TradingView Lightweight Charts</dd>
-        </div>
-        <div>
-          <dt>Database</dt>
-          <dd>MySQL with Alembic startup migrations</dd>
-        </div>
-      </dl>
-
-      <p-button label="Check backend" icon="pi pi-refresh" (onClick)="checkBackend()" />
-    </p-card>
-
-    <p-card header="MVP Envelope">
+    <p-card header="Configuration">
       <dl>
         <div>
           <dt>Exchange</dt>
-          <dd>Bybit spot</dd>
+          <dd>{{ readModels()?.configuration?.exchange || 'unavailable' }}</dd>
         </div>
         <div>
           <dt>Asset</dt>
-          <dd>BTC/USDT, M1</dd>
+          <dd>
+            {{ readModels()?.configuration?.symbol || 'unavailable' }},
+            {{ readModels()?.configuration?.timeframe || 'unavailable' }}
+          </dd>
+        </div>
+        <div>
+          <dt>Capital</dt>
+          <dd>{{ readModels()?.configuration?.initial_capital_usd || 'unavailable' }} USD</dd>
         </div>
         <div>
           <dt>Mode</dt>
-          <dd>Paper before live</dd>
+          <dd>{{ readModels()?.configuration?.mode || 'unavailable' }}</dd>
         </div>
       </dl>
+    </p-card>
+
+    <p-card header="Operation">
+      <div class="card-title-row">
+        <p-tag [severity]="operationSeverity()" [value]="readModels()?.operation?.state || 'UNKNOWN'" />
+      </div>
+
+      <dl>
+        <div>
+          <dt>Approved or active models</dt>
+          <dd>{{ readModels()?.operation?.approved_or_active_models ?? 0 }}</dd>
+        </div>
+        <div>
+          <dt>Open positions</dt>
+          <dd>{{ readModels()?.operation?.open_positions ?? 0 }}</dd>
+        </div>
+        <div>
+          <dt>Pending commands</dt>
+          <dd>{{ readModels()?.operation?.pending_commands ?? 0 }}</dd>
+        </div>
+      </dl>
+
+      @if ((readModels()?.operation?.blockers?.length ?? 0) > 0) {
+        <ul class="blockers">
+          @for (blocker of readModels()?.operation?.blockers; track blocker) {
+            <li>{{ blocker }}</li>
+          }
+        </ul>
+      }
+    </p-card>
+
+    <p-card header="Strategies">
+      <p class="metric">{{ readModels()?.strategies?.items?.length ?? 0 }}</p>
+      <span class="muted">registered strategies</span>
+    </p-card>
+
+    <p-card header="Models">
+      <p class="metric">{{ readModels()?.models?.items?.length ?? 0 }}</p>
+      <span class="muted">registered models</span>
+    </p-card>
+
+    <p-card header="Events">
+      <p class="metric">{{ readModels()?.events?.items?.length ?? 0 }}</p>
+      <span class="muted">recent operational events</span>
     </p-card>
   </section>
 

@@ -8,6 +8,11 @@ class Settings(BaseSettings):
     environment: str = "development"
     database_url: str = "mysql+pymysql://smart_trade:smart_trade@mysql:3306/smart_trade"
     run_migrations_on_startup: bool = True
+    exchange: str = "bybit"
+    symbol: str = "BTC/USDT"
+    timeframe: str = "1m"
+    initial_capital_usd: float = 1000.0
+    mode: str = "paper"
 
     model_config = SettingsConfigDict(
         env_file=".env",
