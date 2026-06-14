@@ -1,0 +1,53 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Backend: start",
+      "type": "shell",
+      "command": "uv run --group training --group exchange uvicorn smart_trade_backend.main:app --host 0.0.0.0 --port 8000 --reload",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "python",
+        "pattern": [
+          {
+            "regexp": "^(.*)$",
+            "message": 1
+          }
+        ],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Uvicorn running on|Started reloader process",
+          "endsPattern": "Application startup complete|Uvicorn running on"
+        }
+      }
+    },
+    {
+      "label": "Frontend: start",
+      "type": "npm",
+      "script": "start",
+      "path": "frontend",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "typescript",
+        "pattern": "$tsc",
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Changes detected|Application bundle generation",
+          "endsPattern": "bundle generation (complete|failed)|Local:"
+        }
+      }
+    },
+    {
+      "label": "Full Stack: start",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "Backend: start",
+        "Frontend: start"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}
