@@ -253,6 +253,34 @@ class PaperStatusResponse(BaseModel):
     recent_orders: list[PaperOrderSummary]
 
 
+class LiveReadinessReviewSummary(BaseModel):
+    id: int
+    status: str
+    requested_by: str
+    reviewed_at: datetime
+    enabled_at: datetime | None
+    checks: list[dict[str, Any]]
+    evidence: dict[str, Any]
+    failure_reasons: list[str]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LiveReadinessStatusResponse(BaseModel):
+    ready: bool
+    checks: list[dict[str, Any]]
+    failure_reasons: list[str]
+    latest_review: LiveReadinessReviewSummary | None
+
+
+class LiveReadinessEnableCreate(BaseModel):
+    requested_by: str = Field(default="operator", min_length=1, max_length=128)
+
+
+class LiveReadinessEnableResponse(BaseModel):
+    review: LiveReadinessReviewSummary
+
+
 class OperationalEvent(BaseModel):
     id: int
     event_type: str

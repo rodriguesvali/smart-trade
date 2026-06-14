@@ -309,6 +309,38 @@ dd {
   margin-bottom: 14px;
 }
 
+.readiness-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.readiness-header span {
+  color: #607085;
+  font-size: 0.875rem;
+}
+
+.check-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.check-list span {
+  color: #334155;
+  font-size: 0.875rem;
+}
+
 .placeholder-list article {
   display: grid;
   gap: 8px;

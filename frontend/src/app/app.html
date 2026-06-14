@@ -178,6 +178,28 @@
               </dl>
             </p-card>
 
+            <p-card header="Live Readiness">
+              <div class="readiness-header">
+                <p-tag [severity]="liveReadinessSeverity()" [value]="liveReadinessLabel()" />
+                <span>{{ readModels()?.liveReadiness?.failure_reasons?.length ?? 0 }} blocker(s)</span>
+              </div>
+              @if ((readModels()?.liveReadiness?.checks?.length ?? 0) > 0) {
+                <ul class="check-list">
+                  @for (check of readModels()?.liveReadiness?.checks; track check['check_id']) {
+                    <li>
+                      <p-tag
+                        [severity]="checkPassed(check) ? 'success' : 'warn'"
+                        [value]="checkPassed(check) ? 'PASS' : 'BLOCK'"
+                      />
+                      <span>{{ checkLabel(check) }}</span>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <p class="empty-copy">No readiness evidence has been evaluated.</p>
+              }
+            </p-card>
+
             <p-card header="Configuration">
               <dl>
                 <div>

@@ -725,3 +725,92 @@ B6 did not implement:
 - frontend controls to start/stop paper operation.
 
 Those remain B7/B8 concerns or later runtime hardening.
+
+---
+
+# B7 Backend - Live Readiness Gate
+
+Status: Draft for Agentic Architect review  
+Persona: @backend.eng  
+Date: 2026-06-14  
+Source artifacts: `project-context/1.define/prd.md`, `project-context/1.define/sad.md`, `project-context/2.build/build-plan.md`, `project-context/2.build/backend.md`
+
+## 1. Scope Completed
+
+B7 implemented the live-readiness gate and audit trail. It does not enable live order submission.
+
+Implemented:
+
+- Live readiness evaluation service with checks for:
+  - at least 7 consecutive paper days;
+  - 30 simulated paper trades or full 7-day run;
+  - no critical operational events;
+  - at most one open paper position;
+  - complete model/strategy traceability on paper decisions and positions;
+  - compatible selected strategy and approved/active model evidence;
+  - MVP static exchange-limit validation for spot long-only scope;
+  - paper risk threshold using max drawdown.
+- Manual live enablement review that persists `READY` or `BLOCKED` evidence.
+- New persistence table:
+  - `live_readiness_reviews`.
+- Alembic migration:
+  - `20260614_0004_b7_live_readiness.py`.
+- Backend API contracts:
+  - `GET /api/live-readiness/status`;
+  - `POST /api/live-readiness/enable`.
+- `ENABLE_LIVE` command handling now evaluates and records live-readiness evidence or fails auditably.
+
+## 2. Documentation Consulted
+
+Context7 was consulted before backend implementation:
+
+- SQLAlchemy `/websites/sqlalchemy_en_20`: declarative ORM `Mapped`/`mapped_column`, JSON/DateTime mappings, `Session` add/commit, and `select` patterns.
+
+FastAPI and Angular docs consulted earlier in B6 remain applicable to the B7 API/read-model implementation.
+
+## 3. Verification
+
+Executed successfully:
+
+```bash
+cd backend
+uv run pytest
+uv run ruff check .
+```
+
+Result:
+
+- `20 passed`.
+- Existing FastAPI/Starlette TestClient deprecation warning remains unchanged.
+- Ruff returned `All checks passed.`
+
+Executed successfully:
+
+```bash
+cd backend
+SMART_TRADE_DATABASE_URL=sqlite+pysqlite:////tmp/smart_trade_b7_migration.db uv run alembic upgrade head
+SMART_TRADE_DATABASE_URL=sqlite+pysqlite:////tmp/smart_trade_b7_migration.db uv run alembic current
+```
+
+Result:
+
+- Alembic upgraded to `20260614_0004 (head)`.
+
+New B7 tests:
+
+- `tests/test_live_readiness.py::test_live_readiness_blocks_before_seven_paper_days`
+- `tests/test_live_readiness.py::test_live_readiness_blocks_critical_events_and_traceability_failures`
+- `tests/test_live_readiness.py::test_live_readiness_enablement_is_auditable_when_checks_pass`
+
+## 4. Intentional Non-Scope
+
+B7 did not implement:
+
+- private exchange credentials;
+- live order submission;
+- CCXT private adapter;
+- exchange precision/limit checks from live exchange metadata;
+- balance validation;
+- live restart reconciliation.
+
+Those remain B8 scope.

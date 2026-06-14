@@ -171,6 +171,24 @@ export interface PaperStatusResponse {
   recent_orders: PaperOrderSummary[];
 }
 
+export interface LiveReadinessReviewSummary {
+  id: number;
+  status: string;
+  requested_by: string;
+  reviewed_at: string;
+  enabled_at: string | null;
+  checks: Record<string, unknown>[];
+  evidence: Record<string, unknown>;
+  failure_reasons: string[];
+}
+
+export interface LiveReadinessStatusResponse {
+  ready: boolean;
+  checks: Record<string, unknown>[];
+  failure_reasons: string[];
+  latest_review: LiveReadinessReviewSummary | null;
+}
+
 export interface OperationalEvent {
   id: number;
   event_type: string;
@@ -237,6 +255,7 @@ export interface OperatorReadModels {
   marketData: MarketDataStatus;
   trainingRuns: ModelTrainingRunsResponse;
   paper: PaperStatusResponse;
+  liveReadiness: LiveReadinessStatusResponse;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -257,6 +276,7 @@ export class OperatorApi {
       marketData: this.http.get<MarketDataStatus>('/api/data/status'),
       trainingRuns: this.http.get<ModelTrainingRunsResponse>('/api/models/training-runs'),
       paper: this.http.get<PaperStatusResponse>('/api/paper/status'),
+      liveReadiness: this.http.get<LiveReadinessStatusResponse>('/api/live-readiness/status'),
     });
   }
 }

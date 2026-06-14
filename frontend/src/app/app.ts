@@ -128,6 +128,12 @@ export class App implements OnInit {
   protected readonly latestPaperOrder = computed(() => {
     return this.readModels()?.paper.recent_orders[0] ?? null;
   });
+  protected readonly liveReadinessLabel = computed(() => {
+    return this.readModels()?.liveReadiness.ready ? 'READY' : 'BLOCKED';
+  });
+  protected readonly liveReadinessSeverity = computed(() => {
+    return this.readModels()?.liveReadiness.ready ? 'success' : 'warn';
+  });
 
   ngOnInit(): void {
     this.refresh();
@@ -171,6 +177,14 @@ export class App implements OnInit {
       return 'Unavailable';
     }
     return String(modelRef['model_id'] ?? 'Unavailable');
+  }
+
+  protected checkLabel(check: Record<string, unknown>): string {
+    return String(check['label'] ?? check['check_id'] ?? 'Readiness check');
+  }
+
+  protected checkPassed(check: Record<string, unknown>): boolean {
+    return check['passed'] === true;
   }
 
   private refreshReadModels(): void {

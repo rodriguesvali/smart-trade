@@ -18,6 +18,9 @@ from smart_trade_backend.api.schemas import (
     EventsResponse,
     FeatureGenerationResponse,
     IngestionRunCreate,
+    LiveReadinessEnableCreate,
+    LiveReadinessEnableResponse,
+    LiveReadinessStatusResponse,
     MarketDataStatus,
     ModelApprovalResponse,
     ModelEvidenceResponse,
@@ -62,6 +65,11 @@ from smart_trade_backend.application.read_models import (
     list_models,
     list_strategies,
     operation_status,
+)
+from smart_trade_backend.application.readiness.live import (
+    LiveReadinessError,
+    enable_live_readiness,
+    live_readiness_status,
 )
 from smart_trade_backend.application.strategy.registry import (
     StrategySelectionError,
@@ -185,6 +193,29 @@ def post_paper_run(request: PaperRunCreate, session: SessionDep):
     try:
         return run_paper_replay(session, get_settings(), limit=request.limit)
     except PaperRuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/live-readiness/status", response_model=LiveReadinessStatusResponse)
+def get_live_readiness_status(session: SessionDep) -> dict:
+    return live_readiness_status(session, get_settings())
+
+
+@router.post(
+    "/live-readiness/enable",
+    response_model=LiveReadinessEnableResponse,
+    status_code=201,
+)
+def post_live_readiness_enable(request: LiveReadinessEnableCreate, session: SessionDep) -> dict:
+    try:
+        return {
+            "review": enable_live_readiness(
+                session,
+                get_settings(),
+                requested_by=request.requested_by,
+            )
+        }
+    except LiveReadinessError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 

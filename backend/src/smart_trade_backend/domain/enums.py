@@ -46,6 +46,7 @@ class CommandType(StrEnum):
     APPROVE_MODEL = "APPROVE_MODEL"
     SELECT_STRATEGY = "SELECT_STRATEGY"
     START_PAPER = "START_PAPER"
+    ENABLE_LIVE = "ENABLE_LIVE"
     STOP_OPERATION = "STOP_OPERATION"
 
 
@@ -84,4 +85,3 @@ class EventSeverity(StrEnum):
     WARNING = "WARNING"
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
-

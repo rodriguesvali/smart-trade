@@ -366,3 +366,47 @@ Result:
 ## 4. Intentional Non-Scope
 
 B6 frontend did not add start/stop paper controls. Paper operation remains backend-mediated through API/command contracts.
+
+---
+
+# B7 Frontend Update - Live Readiness Evidence
+
+Status: Draft for Agentic Architect review  
+Persona: @frontend.eng  
+Date: 2026-06-14
+
+## 1. Scope Completed
+
+B7 updated the operational console to show backend-mediated live readiness evidence.
+
+Implemented:
+
+- Extended typed Angular contracts with `GET /api/live-readiness/status`.
+- Added live readiness read model to the dashboard aggregate load.
+- Updated the Operation view to show:
+  - readiness `READY`/`BLOCKED` tag;
+  - blocker count;
+  - individual readiness checks with pass/block tags.
+
+## 2. Documentation Consulted
+
+Context7 was consulted for Angular typed `HttpClient` service/read-model patterns.
+
+PrimeNG MCP was consulted for `Tag`; B7 reused existing PrimeNG card/tag primitives.
+
+## 3. Verification
+
+Executed successfully:
+
+```bash
+npm --prefix frontend run build
+```
+
+Result:
+
+- Angular production build completed successfully.
+- Remaining warnings: initial bundle exceeds the 500 kB warning budget and root component style exceeds the 4 kB warning budget; both remain below error budgets.
+
+## 4. Intentional Non-Scope
+
+B7 frontend did not add a live-enable button. Manual readiness enablement remains backend-mediated through API/command contracts.

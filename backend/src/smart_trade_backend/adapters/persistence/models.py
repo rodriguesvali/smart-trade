@@ -387,6 +387,24 @@ class EquitySnapshotRecord(TimestampMixin, Base):
     __table_args__ = (Index("ix_equity_snapshots_snapshot_at", "snapshot_at"),)
 
 
+class LiveReadinessReviewRecord(TimestampMixin, Base):
+    __tablename__ = "live_readiness_reviews"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    requested_by: Mapped[str] = mapped_column(String(128), nullable=False)
+    reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    checks: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
+    evidence: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    failure_reasons: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+
+    __table_args__ = (
+        Index("ix_live_readiness_reviews_status", "status"),
+        Index("ix_live_readiness_reviews_reviewed_at", "reviewed_at"),
+    )
+
+
 class CommandRequestRecord(TimestampMixin, Base):
     __tablename__ = "command_requests"
 

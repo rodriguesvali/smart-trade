@@ -9,6 +9,10 @@ from smart_trade_backend.application.model_training.service import (
     approve_model,
 )
 from smart_trade_backend.application.paper.runtime import PaperRuntimeError, run_paper_replay
+from smart_trade_backend.application.readiness.live import (
+    LiveReadinessError,
+    enable_live_readiness,
+)
 from smart_trade_backend.application.strategy.registry import (
     StrategySelectionError,
     select_strategy,
@@ -21,6 +25,7 @@ SUPPORTED_COMMANDS = {
     CommandType.SELECT_STRATEGY,
     CommandType.APPROVE_MODEL,
     CommandType.START_PAPER,
+    CommandType.ENABLE_LIVE,
 }
 
 
@@ -83,6 +88,23 @@ def create_command_request(
                 "fills_created": paper_run.fills_created,
                 "equity_snapshots_created": paper_run.equity_snapshots_created,
                 "open_position_id": paper_run.open_position_id,
+            }
+    elif command_type == CommandType.ENABLE_LIVE and settings is not None:
+        try:
+            review = enable_live_readiness(
+                session,
+                settings,
+                requested_by=requested_by,
+            )
+        except LiveReadinessError as exc:
+            status = CommandStatus.FAILED
+            result = {"reason": str(exc)}
+        else:
+            status = CommandStatus.COMPLETED
+            result = {
+                "live_readiness_review_id": review.id,
+                "status": review.status,
+                "enabled_at": review.enabled_at.isoformat() if review.enabled_at else None,
             }
 
     record = CommandRequestRecord(

@@ -11,8 +11,8 @@ This artifact defines the Smart Trade MVP test scenarios from the QA perspective
 
 The scenarios are split into:
 
-- **Executable now**: B0-B6 behavior currently implemented.
-- **Prepared for later increments**: B7-B8 behavior required by PRD/SAD but not implemented yet.
+- **Executable now**: B0-B7 behavior currently implemented.
+- **Prepared for later increments**: B8 behavior required by PRD/SAD but not implemented yet.
 
 QA must not validate with real capital unless the Agentic Architect explicitly approves a live-readiness test window. B8 live tests must be preceded by B6 paper evidence and B7 readiness approval.
 
@@ -27,6 +27,7 @@ Current implemented increments:
 - B4: strategy plugin contract, default strategy registration, strategy selection gate, frontend strategy requirements visibility.
 - B5: model training, walk-forward validation, holdout backtest, model artifact persistence, and manual approval gate.
 - B6: paper inference/runtime over persisted candles/features with simulated decisions, orders, fills, positions, and equity.
+- B7: live-readiness gate with auditable manual enablement evidence.
 
 Current automated baseline:
 
@@ -196,7 +197,7 @@ Results:
 - Backend: `17 passed`, ruff `All checks passed`.
 - Frontend: production build succeeded with known warning-level budgets.
 
-## 10. Prepared for B7 - Live Readiness Gate
+## 10. Executable Now - B7 Live Readiness Gate
 
 | ID | Scenario | Requirements | Steps | Expected Result | Severity |
 | --- | --- | --- | --- | --- | --- |
@@ -205,6 +206,33 @@ Results:
 | QA-B7-003 | Critical unresolved failures block live readiness | RNF5.11, B7 scope | Create unresolved critical operational event. | Live readiness remains blocked and reason visible. | Critical |
 | QA-B7-004 | Model/strategy traceability is required for readiness | RNF5.10, DR6.10 | Remove/invalidate traceability fields in paper records. | Readiness fails. | Critical |
 | QA-B7-005 | Manual enablement is auditable | B7 scope | Approve live readiness manually. | Command/event records include operator, time, evidence snapshot, and result. | Critical |
+
+Current B7 automated coverage:
+
+- `tests/test_live_readiness.py::test_live_readiness_blocks_before_seven_paper_days`
+  - validates live readiness is blocked before 7 consecutive paper days.
+- `tests/test_live_readiness.py::test_live_readiness_blocks_critical_events_and_traceability_failures`
+  - validates critical operational events and traceability failures block readiness.
+- `tests/test_live_readiness.py::test_live_readiness_enablement_is_auditable_when_checks_pass`
+  - validates positive readiness review and `ENABLE_LIVE` command audit.
+
+Current B7 verification evidence:
+
+```bash
+cd backend
+uv run pytest
+uv run ruff check .
+SMART_TRADE_DATABASE_URL=sqlite+pysqlite:////tmp/smart_trade_b7_migration.db uv run alembic upgrade head
+SMART_TRADE_DATABASE_URL=sqlite+pysqlite:////tmp/smart_trade_b7_migration.db uv run alembic current
+
+npm --prefix frontend run build
+```
+
+Results:
+
+- Backend: `20 passed`, ruff `All checks passed`.
+- Alembic: upgraded to `20260614_0004 (head)`.
+- Frontend: production build succeeded with known warning-level budgets.
 
 ## 11. Prepared for B8 - Live Spot Execution
 
@@ -251,9 +279,9 @@ Minimum smoke expectations through B4:
 ## 13. Current Residual Risks
 
 - B5 training and approval gates are implemented, including artifact existence/JSON integrity checks.
-- B6 paper runtime is implemented, but long-running scheduling, seven-day paper readiness evidence, and live readiness are not implemented until B7.
+- B6 paper runtime is implemented and B7 live readiness evidence gate is implemented; long-running scheduling hardening remains future work before real live operation.
 - Operation remains intentionally blocked without compatible approved/active model evidence.
-- B3 feature no-look-ahead behavior has deterministic coverage but should be expanded with explicit boundary fixtures before B7.
+- B3 feature no-look-ahead behavior has deterministic coverage but should be expanded with explicit boundary fixtures before B8.
 - Frontend selection controls and strategy parameter editing are not implemented in B4; selection is API/command mediated.
 - Live readiness and live execution must remain untested with real capital until B6/B7 evidence is approved.
 
@@ -280,7 +308,7 @@ Result summary:
 
 - Passed: 20
 - Failed: 0
-- Skipped/not executed in Playwright: B7-B8 future scenarios and selected B0-B6 scenarios that require infrastructure fault injection, exchange variability, or service-level runtime-context overrides.
+- Skipped/not executed in Playwright: B8 future scenarios and selected B0-B7 scenarios that require infrastructure fault injection, exchange variability, or service-level runtime-context overrides.
 
 Executed scenarios:
 
@@ -312,22 +340,22 @@ Not executed in this Playwright run:
 - QA-B0-002: DB unavailable/failure injection should be run as a process-startup fault test.
 - QA-B2-004: partial empty-state coverage remains from backend API tests; full UI empty-registry state is superseded by B4 startup strategy registration.
 - QA-B3-001, QA-B3-002, QA-B3-003: covered by existing backend automated tests and previous smoke; not repeated in Playwright to avoid external public exchange variability.
-- QA-B3-004: should be expanded as deterministic service-level fixture before B7.
+- QA-B3-004: should be expanded as deterministic service-level fixture before B8.
 - QA-B3-006, QA-B3-007: require exchange adapter fault injection and credential-environment assertions.
 - QA-B4-006: requires either multiple compatible strategy fixtures or DB-level assertion of deselection history.
 - QA-B4-008: requires service-level runtime-context override for non-spot/non-long-only/non-`1m` compatibility.
 - B5/B6 UI scenarios were not rerun in Playwright after implementation; current evidence is backend automated tests, migration checks where applicable, XGBoost import, and Angular production build.
-- B7-B8 scenarios: pending future implementation.
+- B8 scenarios: pending future implementation.
 
 ## 15. Review Checklist for Agentic Architect
 
 - Confirm scenario coverage matches MVP scope and does not introduce out-of-scope trading behavior.
-- Confirm B7-B8 planned scenarios are acceptable as future gate criteria.
-- Confirm whether QA should now implement additional Playwright coverage for B5/B6 model and paper evidence views before B7 begins.
+- Confirm B8 planned scenarios are acceptable as future gate criteria.
+- Confirm whether QA should now implement additional Playwright coverage for B5-B7 model, paper, and readiness evidence views before B8 begins.
 
 ## 16. Audit
 
 - Generated by: @qa.eng
-- Action: Updated QA scenario matrix for implemented B0-B6 and planned B7-B8 safety gates.
+- Action: Updated QA scenario matrix for implemented B0-B7 and planned B8 safety gates.
 - Date: 2026-06-14
 - Review status: Pending Agentic Architect review.
