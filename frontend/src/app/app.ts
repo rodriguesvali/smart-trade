@@ -1,65 +1,34 @@
-import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
 import { TagModule } from 'primeng/tag';
-import { forkJoin } from 'rxjs';
 
-type HealthState = 'unknown' | 'ok' | 'error';
-
-interface ConfigurationSummary {
-  exchange: string;
-  symbol: string;
-  timeframe: string;
-  initial_capital_usd: string;
-  mode: string;
-}
-
-interface StrategiesResponse {
-  selected_strategy_id: number | null;
-  items: unknown[];
-}
-
-interface ModelsResponse {
-  items: unknown[];
-}
-
-interface OperationStatus {
-  state: string;
-  mode: string;
-  approved_or_active_models: number;
-  open_positions: number;
-  pending_commands: number;
-  blockers: string[];
-}
-
-interface EventsResponse {
-  items: unknown[];
-}
-
-interface OperatorReadModels {
-  configuration: ConfigurationSummary;
-  strategies: StrategiesResponse;
-  models: ModelsResponse;
-  operation: OperationStatus;
-  events: EventsResponse;
-}
+import { HealthState, OperatorApi, OperatorReadModels } from './api/operator-api';
+import { TradeChartComponent } from './charts/trade-chart.component';
+import { EventsViewComponent } from './events-view.component';
+import { ModelsViewComponent } from './models-view.component';
 
 @Component({
   selector: 'app-root',
-  imports: [ButtonModule, CardModule, RouterOutlet, TagModule],
+  imports: [ButtonModule, CardModule, EventsViewComponent, ModelsViewComponent, TagModule, TradeChartComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
 export class App implements OnInit {
-  private readonly http = inject(HttpClient);
+  private readonly operatorApi = inject(OperatorApi);
 
   protected readonly title = signal('Smart Trade');
   protected readonly backendStatus = signal<HealthState>('unknown');
   protected readonly readModels = signal<OperatorReadModels | null>(null);
   protected readonly readModelError = signal(false);
   protected readonly loadingReadModels = signal(false);
+  protected activeTab = 'operation';
+  protected readonly navigation = [
+    { id: 'operation', label: 'Operation', icon: 'pi pi-chart-line' },
+    { id: 'models', label: 'Models', icon: 'pi pi-verified' },
+    { id: 'training', label: 'Training', icon: 'pi pi-database' },
+    { id: 'logs', label: 'Events', icon: 'pi pi-list' },
+  ];
   protected readonly backendLabel = computed(() => {
     const status = this.backendStatus();
     if (status === 'ok') {
@@ -69,6 +38,16 @@ export class App implements OnInit {
       return 'Backend offline';
     }
     return 'Backend unchecked';
+  });
+  protected readonly backendSeverity = computed(() => {
+    const status = this.backendStatus();
+    if (status === 'ok') {
+      return 'success';
+    }
+    if (status === 'error') {
+      return 'danger';
+    }
+    return 'warn';
   });
   protected readonly operationSeverity = computed(() => {
     const state = this.readModels()?.operation.state;
@@ -83,6 +62,31 @@ export class App implements OnInit {
     }
     return 'info';
   });
+  protected readonly selectedStrategy = computed(() => {
+    const readModels = this.readModels();
+    if (!readModels?.strategies.selected_strategy_id) {
+      return null;
+    }
+    return readModels.strategies.items.find(
+      (strategy) => strategy.id === readModels.strategies.selected_strategy_id
+    ) ?? null;
+  });
+  protected readonly activeModelCount = computed(() => {
+    return this.readModels()?.models.items.filter((model) => {
+      return model.status === 'APPROVED' || model.status === 'ACTIVE';
+    }).length ?? 0;
+  });
+  protected readonly marketLabel = computed(() => {
+    const configuration = this.readModels()?.configuration;
+    return `${configuration?.exchange || 'Bybit'} / ${configuration?.symbol || 'BTC/USDT'} / ${configuration?.timeframe || 'M1'}`;
+  });
+  protected readonly readinessLabel = computed(() => {
+    const blockers = this.readModels()?.operation.blockers.length ?? 0;
+    if (blockers > 0) {
+      return `${blockers} blocker${blockers > 1 ? 's' : ''}`;
+    }
+    return 'Gate clear';
+  });
 
   ngOnInit(): void {
     this.refresh();
@@ -90,7 +94,7 @@ export class App implements OnInit {
 
   protected checkBackend(): void {
     this.backendStatus.set('unknown');
-    this.http.get<{ status: string }>('/api/health').subscribe({
+    this.operatorApi.health().subscribe({
       next: (response) => {
         this.backendStatus.set(response.status === 'ok' ? 'ok' : 'error');
       },
@@ -105,17 +109,15 @@ export class App implements OnInit {
     this.refreshReadModels();
   }
 
+  protected selectTab(tabId: string): void {
+    this.activeTab = tabId;
+  }
+
   private refreshReadModels(): void {
     this.loadingReadModels.set(true);
     this.readModelError.set(false);
 
-    forkJoin({
-      configuration: this.http.get<ConfigurationSummary>('/api/configuration/summary'),
-      strategies: this.http.get<StrategiesResponse>('/api/strategies'),
-      models: this.http.get<ModelsResponse>('/api/models'),
-      operation: this.http.get<OperationStatus>('/api/operation/status'),
-      events: this.http.get<EventsResponse>('/api/events?limit=10'),
-    }).subscribe({
+    this.operatorApi.readModels().subscribe({
       next: (readModels) => {
         this.readModels.set(readModels);
         this.loadingReadModels.set(false);

@@ -1,0 +1,74 @@
+import { DatePipe } from '@angular/common';
+import { Component, Input } from '@angular/core';
+import { CardModule } from 'primeng/card';
+import { TableModule } from 'primeng/table';
+import { TagModule } from 'primeng/tag';
+
+import { ModelSummary, StrategySummary } from './api/operator-api';
+
+@Component({
+  selector: 'app-models-view',
+  imports: [CardModule, DatePipe, TableModule, TagModule],
+  template: `
+    <section class="console-grid two-column-grid">
+      <p-card header="Model Registry">
+        <p-table [value]="models" [tableStyle]="{ 'min-width': '46rem' }">
+          <ng-template pTemplate="header">
+            <tr>
+              <th>Model</th>
+              <th>Role</th>
+              <th>Strategy</th>
+              <th>Status</th>
+              <th>Created</th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-model>
+            <tr>
+              <td>{{ model.model_id }}</td>
+              <td>{{ model.model_role }}</td>
+              <td>{{ model.strategy_id }} {{ model.strategy_version }}</td>
+              <td><p-tag [severity]="model.status === 'APPROVED' || model.status === 'ACTIVE' ? 'success' : 'info'" [value]="model.status" /></td>
+              <td>{{ model.created_at | date:'short' }}</td>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="emptymessage">
+            <tr>
+              <td colspan="5">No models registered yet.</td>
+            </tr>
+          </ng-template>
+        </p-table>
+      </p-card>
+
+      <p-card header="Strategy Registry">
+        <p-table [value]="strategies" [tableStyle]="{ 'min-width': '40rem' }">
+          <ng-template pTemplate="header">
+            <tr>
+              <th>Name</th>
+              <th>Version</th>
+              <th>Status</th>
+              <th>Roles</th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-strategy>
+            <tr>
+              <td>{{ strategy.name }}</td>
+              <td>{{ strategy.version }}</td>
+              <td><p-tag [severity]="strategy.id === selectedStrategyId ? 'success' : 'info'" [value]="strategy.status" /></td>
+              <td>{{ strategy.model_roles.length }}</td>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="emptymessage">
+            <tr>
+              <td colspan="4">No strategies registered yet.</td>
+            </tr>
+          </ng-template>
+        </p-table>
+      </p-card>
+    </section>
+  `,
+})
+export class ModelsViewComponent {
+  @Input() models: ModelSummary[] = [];
+  @Input() strategies: StrategySummary[] = [];
+  @Input() selectedStrategyId: number | null = null;
+}

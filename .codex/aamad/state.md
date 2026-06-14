@@ -14,7 +14,7 @@ Frontend stack: Angular + PrimeNG.
 
 ## Current Stage
 
-Define phase completed and approved by the Agentic Architect on 2026-06-14. Build phase B0 setup was completed and approved by the Agentic Architect on 2026-06-14. Build phase B1 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B2 is the next increment and must not begin until explicitly requested or redirected by the Agentic Architect.
+Define phase completed and approved by the Agentic Architect on 2026-06-14. Build phase B0 setup was completed and approved by the Agentic Architect on 2026-06-14. Build phase B1 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B2 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B3 is the next increment and must not begin until explicitly requested or redirected by the Agentic Architect.
 
 AAMAD files generated from the upstream IDE format were adapted into `.codex/aamad/`. AAMAD Flow should use only the Codex-local files in this repository.
 
@@ -36,11 +36,12 @@ AAMAD files generated from the upstream IDE format were adapted into `.codex/aam
 - `project-context/2.build/build-plan.md`
 - `project-context/2.build/setup.md`
 - `project-context/2.build/backend.md`
+- `project-context/2.build/frontend.md`
 
 ## Pending Artifacts
 
-- Build B2 artifact for the minimal frontend operational console.
+- Build B3 artifact for the historical data and feature pipeline.
 
 ## Review Gate
 
-B1 gate is approved. Continue to B2 only after the Agentic Architect explicitly requests or redirects the next Build increment.
+B2 gate is approved. Continue to B3 only after the Agentic Architect explicitly requests or redirects the next Build increment.

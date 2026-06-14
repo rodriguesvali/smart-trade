@@ -1,100 +1,239 @@
 <main class="app-shell">
-  <header class="topbar">
-    <div>
-      <p class="eyebrow">Build B1</p>
-      <h1>{{ title() }}</h1>
+  <aside class="side-rail" aria-label="Primary dashboard navigation">
+    <div class="brand-lockup">
+      <div class="brand-mark">ST</div>
+      <div>
+        <strong>Smart Trade</strong>
+        <span>Operator console</span>
+      </div>
     </div>
 
-    <div class="topbar-actions">
+    <nav class="rail-nav" role="tablist" aria-label="Dashboard views">
+      @for (item of navigation; track item.id) {
+        <button
+          type="button"
+          role="tab"
+          class="rail-nav-item"
+          [class.active]="activeTab === item.id"
+          [attr.aria-selected]="activeTab === item.id"
+          (click)="selectTab(item.id)"
+        >
+          <i [class]="item.icon" aria-hidden="true"></i>
+          <span>{{ item.label }}</span>
+        </button>
+      }
+    </nav>
+
+    <section class="rail-status">
+      <span>Runtime</span>
+      <p-tag [severity]="backendSeverity()" [value]="backendLabel()" />
       <p-tag
-        [severity]="backendStatus() === 'ok' ? 'success' : backendStatus() === 'error' ? 'danger' : 'warn'"
-        [value]="backendLabel()"
+        [severity]="readModels()?.configuration?.mode === 'live' ? 'danger' : 'info'"
+        [value]="readModels()?.configuration?.mode || 'mode unknown'"
       />
-      <p-button
-        icon="pi pi-refresh"
-        ariaLabel="Refresh"
-        [loading]="loadingReadModels()"
-        (onClick)="refresh()"
-      />
-    </div>
-  </header>
-
-  @if (readModelError()) {
-    <section class="notice">
-      <strong>Backend API unavailable.</strong>
-      <span>Operational read models could not be loaded.</span>
     </section>
-  }
+  </aside>
 
-  <section class="status-grid">
-    <p-card header="Configuration">
-      <dl>
-        <div>
-          <dt>Exchange</dt>
-          <dd>{{ readModels()?.configuration?.exchange || 'unavailable' }}</dd>
-        </div>
-        <div>
-          <dt>Asset</dt>
-          <dd>
-            {{ readModels()?.configuration?.symbol || 'unavailable' }},
-            {{ readModels()?.configuration?.timeframe || 'unavailable' }}
-          </dd>
-        </div>
-        <div>
-          <dt>Capital</dt>
-          <dd>{{ readModels()?.configuration?.initial_capital_usd || 'unavailable' }} USD</dd>
-        </div>
-        <div>
-          <dt>Mode</dt>
-          <dd>{{ readModels()?.configuration?.mode || 'unavailable' }}</dd>
-        </div>
-      </dl>
-    </p-card>
-
-    <p-card header="Operation">
-      <div class="card-title-row">
-        <p-tag [severity]="operationSeverity()" [value]="readModels()?.operation?.state || 'UNKNOWN'" />
+  <section class="workspace">
+    <header class="topbar">
+      <div class="page-title">
+        <p class="eyebrow">Build B2 operational console</p>
+        <h1>{{ marketLabel() }}</h1>
+        <span>Spot long-only MVP, one selected strategy, one open position.</span>
       </div>
 
-      <dl>
-        <div>
-          <dt>Approved or active models</dt>
-          <dd>{{ readModels()?.operation?.approved_or_active_models ?? 0 }}</dd>
-        </div>
-        <div>
-          <dt>Open positions</dt>
-          <dd>{{ readModels()?.operation?.open_positions ?? 0 }}</dd>
-        </div>
-        <div>
-          <dt>Pending commands</dt>
-          <dd>{{ readModels()?.operation?.pending_commands ?? 0 }}</dd>
-        </div>
-      </dl>
+      <div class="topbar-actions">
+        <p-tag severity="secondary" value="read-only" />
+        <p-button
+          icon="pi pi-refresh"
+          ariaLabel="Refresh dashboard"
+          [loading]="loadingReadModels()"
+          (onClick)="refresh()"
+        />
+      </div>
+    </header>
 
-      @if ((readModels()?.operation?.blockers?.length ?? 0) > 0) {
-        <ul class="blockers">
-          @for (blocker of readModels()?.operation?.blockers; track blocker) {
-            <li>{{ blocker }}</li>
-          }
-        </ul>
+    @if (readModelError()) {
+      <section class="notice">
+        <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+        <strong>Backend API unavailable.</strong>
+        <span>Operational read models could not be loaded.</span>
+      </section>
+    }
+
+    <section class="command-plane" aria-label="Operational command plane">
+      <article class="gate-panel">
+        <span>Safety gate</span>
+        <div>
+          <p-tag [severity]="operationSeverity()" [value]="readModels()?.operation?.state || 'UNKNOWN'" />
+          <strong>{{ readinessLabel() }}</strong>
+        </div>
+      </article>
+
+      <article>
+        <span>Selected strategy</span>
+        <strong>{{ selectedStrategy()?.name || 'None selected' }}</strong>
+      </article>
+
+      <article>
+        <span>Approved/active models</span>
+        <strong>{{ activeModelCount() }}</strong>
+      </article>
+
+      <article>
+        <span>Open positions</span>
+        <strong>{{ readModels()?.operation?.open_positions ?? 0 }}</strong>
+      </article>
+
+      <article>
+        <span>Pending commands</span>
+        <strong>{{ readModels()?.operation?.pending_commands ?? 0 }}</strong>
+      </article>
+    </section>
+
+    @switch (activeTab) {
+      @case ('operation') {
+        <section class="console-grid operation-grid">
+          <p-card header="Market Tape">
+            <div class="panel-toolbar">
+              <div>
+                <strong>{{ readModels()?.configuration?.symbol || 'BTC/USDT' }}</strong>
+                <span>{{ readModels()?.configuration?.exchange || 'Bybit' }} {{ readModels()?.configuration?.timeframe || 'M1' }}</span>
+              </div>
+              <p-tag severity="info" value="placeholder feed" />
+            </div>
+            @defer (on idle) {
+              <app-trade-chart />
+            } @placeholder {
+              <div class="chart-placeholder">
+                <i class="pi pi-chart-line" aria-hidden="true"></i>
+                <span>Chart loading</span>
+              </div>
+            }
+            <div class="chart-note">
+              <span>Candles, paper markers, and equity curve are local B2 sample data until B3/B6 read models exist.</span>
+            </div>
+          </p-card>
+
+          <div class="side-stack">
+            <p-card header="Strategy Readiness">
+              @if ((readModels()?.operation?.blockers?.length ?? 0) > 0) {
+                <ul class="blockers">
+                  @for (blocker of readModels()?.operation?.blockers; track blocker) {
+                    <li>{{ blocker }}</li>
+                  }
+                </ul>
+              } @else {
+                <p class="empty-copy">No operation blockers reported by the backend.</p>
+              }
+            </p-card>
+
+            <p-card header="Position Snapshot">
+              <dl>
+                <div>
+                  <dt>Status</dt>
+                  <dd>{{ (readModels()?.operation?.open_positions ?? 0) > 0 ? 'OPEN' : 'FLAT' }}</dd>
+                </div>
+                <div>
+                  <dt>Unrealized PnL</dt>
+                  <dd>Unavailable</dd>
+                </div>
+                <div>
+                  <dt>Latest inference</dt>
+                  <dd>Unavailable</dd>
+                </div>
+                <div>
+                  <dt>RSI/IFR</dt>
+                  <dd>Unavailable</dd>
+                </div>
+              </dl>
+            </p-card>
+
+            <p-card header="Configuration">
+              <dl>
+                <div>
+                  <dt>Market</dt>
+                  <dd>{{ readModels()?.configuration?.market_type || 'spot' }} {{ readModels()?.configuration?.direction || 'long_only' }}</dd>
+                </div>
+                <div>
+                  <dt>Base / Quote</dt>
+                  <dd>{{ readModels()?.configuration?.base_asset || 'BTC' }} / {{ readModels()?.configuration?.quote_asset || 'USDT' }}</dd>
+                </div>
+                <div>
+                  <dt>Capital</dt>
+                  <dd>{{ readModels()?.configuration?.initial_capital_usd || 'unavailable' }} USD</dd>
+                </div>
+              </dl>
+            </p-card>
+          </div>
+        </section>
       }
-    </p-card>
 
-    <p-card header="Strategies">
-      <p class="metric">{{ readModels()?.strategies?.items?.length ?? 0 }}</p>
-      <span class="muted">registered strategies</span>
-    </p-card>
+      @case ('models') {
+        @defer {
+          <app-models-view
+            [models]="readModels()?.models?.items || []"
+            [strategies]="readModels()?.strategies?.items || []"
+            [selectedStrategyId]="readModels()?.strategies?.selected_strategy_id || null"
+          />
+        } @placeholder {
+          <div class="view-placeholder">Loading registry view</div>
+        }
+      }
 
-    <p-card header="Models">
-      <p class="metric">{{ readModels()?.models?.items?.length ?? 0 }}</p>
-      <span class="muted">registered models</span>
-    </p-card>
+      @case ('training') {
+        <section class="console-grid training-grid">
+          <p-card header="Training Pipeline">
+            <div class="placeholder-list">
+              <article>
+                <i class="pi pi-history" aria-hidden="true"></i>
+                <strong>Historical data</strong>
+                <span>Unavailable until B3 data collection APIs are implemented.</span>
+              </article>
+              <article>
+                <i class="pi pi-sliders-h" aria-hidden="true"></i>
+                <strong>Feature schema</strong>
+                <span>Unavailable until B3 feature generation APIs are implemented.</span>
+              </article>
+              <article>
+                <i class="pi pi-sitemap" aria-hidden="true"></i>
+                <strong>Walk-forward validation</strong>
+                <span>Unavailable until B5 training and validation APIs are implemented.</span>
+              </article>
+              <article>
+                <i class="pi pi-chart-bar" aria-hidden="true"></i>
+                <strong>Out-of-sample backtest</strong>
+                <span>Unavailable until B5 backtest APIs are implemented.</span>
+              </article>
+            </div>
+          </p-card>
 
-    <p-card header="Events">
-      <p class="metric">{{ readModels()?.events?.items?.length ?? 0 }}</p>
-      <span class="muted">recent operational events</span>
-    </p-card>
+          <p-card header="Approval Gate">
+            <dl>
+              <div>
+                <dt>Required model state</dt>
+                <dd>APPROVED or ACTIVE</dd>
+              </div>
+              <div>
+                <dt>Current compatible models</dt>
+                <dd>{{ readModels()?.operation?.approved_or_active_models ?? 0 }}</dd>
+              </div>
+              <div>
+                <dt>Selected strategy</dt>
+                <dd>{{ selectedStrategy()?.name || 'None' }}</dd>
+              </div>
+            </dl>
+          </p-card>
+        </section>
+      }
+
+      @case ('logs') {
+        @defer {
+          <app-events-view [events]="readModels()?.events?.items || []" />
+        } @placeholder {
+          <div class="view-placeholder">Loading event view</div>
+        }
+      }
+    }
   </section>
-
-  <router-outlet />
 </main>
