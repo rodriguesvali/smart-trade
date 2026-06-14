@@ -74,7 +74,7 @@ The MVP workflow must be sequential and auditable:
 
 - RF1.1: The system must collect historical M1 OHLCV data through CCXT public connections for the configured exchange and symbol.
 - RF1.2: The system must store historical candles, derived features, model metadata, validation metrics, backtest results, strategy decisions, positions, orders, fills, and logs in MySQL-backed structures or durable log files as appropriate.
-- RF1.3: The system must generate feature data from price and volume, including RSI/IFR, Bollinger Bands, returns, volatility, volume variation, and other approved derived indicators.
+- RF1.3: The system must generate feature data from price and volume using TA-Lib as the MVP technical indicator library, including RSI/IFR, Bollinger Bands, returns, volatility, volume variation, and other approved derived indicators.
 - RF1.4: The training window must be configurable, with an initial default recommendation of 60 days of M1 data before the final holdout window.
 - RF1.5: The pipeline must reserve a configurable final holdout window, initially recommended as 3 days, and must not use this data for training.
 - RF1.6: The pipeline must run walk-forward validation within the training period to reduce overfitting and look-ahead bias.
@@ -99,6 +99,7 @@ The MVP workflow must be sequential and auditable:
 
 - RF2.5.1: The system must provide a strategy registry that lists available strategies by stable ID, name, version, description, supported market type, supported direction, required parameters, required features, model requirements, and operational status.
 - RF2.5.2: The system must allow new strategies to be implemented and registered for use by the training, validation, backtest, inference, execution, persistence, and frontend layers through a stable strategy contract.
+- RF2.5.2.1: New strategies must be registerable as plugins, subject to strategy contract validation, compatibility checks, and operational safety gates.
 - RF2.5.3: The MVP must ship with one registered default strategy based on RSI/IFR oversold detection plus XGBoost binary confirmation.
 - RF2.5.4: The MVP must support only one selected operational strategy active at a time for the configured asset.
 - RF2.5.5: A strategy must not be selectable for operation unless it declares compatibility with spot long-only execution and the configured asset/timeframe requirements.
@@ -132,8 +133,8 @@ The MVP workflow must be sequential and auditable:
 
 - RF4.1: The frontend must provide a training/model view showing model status, training period, holdout period, validation metrics, backtest metrics, approval state, confusion matrix, precision, accuracy, and feature importance.
 - RF4.2: The frontend must expose a manual retraining control through the backend API.
-- RF4.3: The frontend must provide an operation view with real-time or near-real-time candlestick visualization and visual markers for long entries and exits.
-- RF4.4: The frontend must show equity curve, realized PnL, unrealized PnL where available, win rate, profit factor, maximum drawdown, trade count, and current position state.
+- RF4.3: The frontend must provide an operation view with real-time or near-real-time candlestick visualization and visual markers for long entries and exits using TradingView Lightweight Charts.
+- RF4.4: The frontend must show equity curve, realized PnL, unrealized PnL where available, win rate, profit factor, maximum drawdown, trade count, and current position state. The MVP should use TradingView Lightweight Charts for the equity curve unless implementation constraints require a documented exception.
 - RF4.5: The frontend must show current RSI/IFR value, latest inference signal, active model ID, and latest strategy decision.
 - RF4.6: The frontend must provide a live log terminal or log view with clear severity display for warnings, exchange errors, rate limits, timeouts, and order rejections.
 - RF4.7: The frontend must clearly distinguish paper mode from live mode.
@@ -209,18 +210,7 @@ Frontend operations must use backend APIs only. Any command that can affect trai
 
 ## 9. Open Questions
 
-- OQ9.1: What Python version and dependency manager should be standardized for backend services?
-- OQ9.2: Which initial exchange, symbol, capital allocation, and fee/slippage assumptions should be used for MVP defaults?
-- OQ9.3: Which indicator library should be selected: TA-Lib, pandas-ta, or another approved package?
-- OQ9.4: Which Angular charting library should be used for candlesticks, markers, and equity curve?
-- OQ9.5: What exact approval thresholds should determine `APPROVED` versus `REJECTED`?
-- OQ9.6: Should model approval be manual-only for MVP, policy-driven, or policy-driven with manual confirmation?
-- OQ9.7: What is the mandatory paper-mode duration or evidence threshold before live operation?
-- OQ9.8: What are the retention periods for candles, features, logs, model artifacts, validation reports, and execution records?
-- OQ9.9: Who owns Alembic migration execution in deployment: startup command, operator command, or CI/CD step?
-- OQ9.10: What are the MVP authentication requirements for the operational frontend?
-- OQ9.11: What exact strategy registration contract should be used for future strategies, including required methods, metadata, validation hooks, and parameter schema?
-- OQ9.12: Should new strategy registration happen through code deployment only for the MVP, or should runtime/plugin loading be supported later?
+No open PRD questions remain.
 
 ## 10. Sources
 
@@ -235,10 +225,26 @@ Frontend operations must use backend APIs only. Any command that can affect trai
 
 - The Agentic Architect has redirected AAMAD Flow to begin PRD consolidation from `docs/proposed-solution.md`.
 - The backend runtime target is `native-python`.
+- Python 3.14 is the standardized backend Python version.
+- `uv` is the standardized backend dependency and environment manager, with dependencies declared in `pyproject.toml` and locked in `uv.lock`.
 - The frontend stack is Angular + PrimeNG.
+- TradingView Lightweight Charts is the selected charting library for MVP candlesticks, entry/exit markers, and equity curve.
+- TA-Lib is the selected MVP technical indicator library and may require native C library installation in Linux/Docker environments.
 - MySQL and Alembic are the current database and migration alignment.
+- Bybit is the initial MVP exchange. Bitcoin is the initial MVP asset, with `BTC/USDT` as the default CCXT spot symbol and Bybit-native symbol formatting handled by the CCXT adapter.
+- Initial operational capital is 1,000 USD.
+- Backtest/paper default cost assumptions are taker fee 0.15% per side and base slippage 0.05% per side for `BTC/USDT` market orders. Stress simulation uses 0.15% slippage per side. Live/paper operation should prefer account-specific Bybit fee rates from API when available.
+- Bybit activation must validate account/jurisdiction availability, spot API availability, fee tier, minimum order size, precision, liquidity, and CCXT support before paper or live operation.
+- MVP manual model approval minimum thresholds are: `precision_class_1 >= 0.55`, `trade_count >= 30`, `net_pnl > 0` after fee/slippage assumptions, `profit_factor >= 1.20`, `max_drawdown <= 8%`, `win_rate >= 45%`, `max_losing_streak <= 5`, and at least 60% of walk-forward windows non-negative or with profit factor above 1.0.
 - The MVP should use paper mode before live trading unless the Agentic Architect explicitly removes that gate.
+- Paper mode is mandatory for at least 7 consecutive days before live operation. Live readiness requires at least 30 simulated trades or a full 7-day run if fewer signals occur, no unresolved critical failures, consistent position/order state, complete model and strategy traceability, exchange limit validation, and paper results within approved risk thresholds. Final live enablement remains manual.
+- MVP retention policy: retain raw M1 candles for 180 days; derived features for 90 days; validation/backtest reports, inference records, strategy decisions, orders, fills, positions, equity snapshots, approval events, and command audit trail for at least 365 days; application logs for 30 days online with rotation; critical execution/error logs for 180 days; approved/active model artifacts indefinitely while operationally relevant; rejected model artifacts for 30 days. Features may be regenerated from retained candle data when needed.
+- The MVP operational frontend has no authentication.
+- Model approval is manual-only for the MVP.
+- Alembic migrations are executed by the backend startup process before dependent backend/trading processes run, with failure causing fail-fast startup.
 - The MVP ships with one default registered strategy, but the product architecture must support adding more registered strategies later.
+- New strategies must be registerable as plugins.
+- Strategy plugins are Python code-deployed backend plugins, not frontend-uploaded scripts. Each plugin must provide metadata (`id`, `name`, `version`, `description`, `supported_market`, `supported_direction`, `timeframes`, `required_features`, `model_required`), a typed parameter schema with defaults and limits, `validate_config(config)`, `required_features(config)`, `on_candle(context)`, `on_position_update(context)`, `risk_rules(config)`, and `compatibility_check(runtime_context)`. Strategy outputs must use standardized decisions such as `HOLD`, `ENTER_LONG`, `MOVE_STOP`, and `EXIT_POSITION`, with reason, signal/confidence where applicable, and risk updates.
 - Only one strategy is selected for operation at a time in the MVP.
 - Derivatives-only data such as open interest and funding rate are optional and not required for spot-only MVP acceptance.
 - Runtime implementation, architecture decisions, project scaffolding, and code generation remain out of scope until this PRD is reviewed and approved.
@@ -246,7 +252,7 @@ Frontend operations must use backend APIs only. Any command that can affect trai
 ## 12. Audit
 
 - Generated by: @product-mgr
-- Action: Consolidated draft PRD from proposed solution into AAMAD project-context format; revised to require an extensible strategy registry while keeping one active MVP strategy.
-- Date: 2026-06-13
+- Action: Consolidated draft PRD from proposed solution into AAMAD project-context format; revised to require an extensible plugin-based strategy registry while keeping one active MVP strategy; updated charting decision to TradingView Lightweight Charts; set initial exchange to Bybit; set initial MVP asset to Bitcoin with default CCXT spot symbol `BTC/USDT`; set initial operational capital to 1,000 USD; set backend Python version to 3.14; set `uv` as backend dependency manager; set TA-Lib as the MVP technical indicator library; set Bybit fee/slippage assumptions for backtest and paper mode; set model approval to manual-only with minimum approval thresholds; set paper-mode live readiness gate; set retention policy; set no frontend authentication for MVP; set Alembic migration execution to startup; set strategy plugin contract.
+- Date: 2026-06-14
 - Review status: Approved by Agentic Architect.
 - Handoff gate: PRD approved. Next AAMAD Define step may proceed when requested by the Agentic Architect.
