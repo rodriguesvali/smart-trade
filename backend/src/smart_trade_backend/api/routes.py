@@ -25,6 +25,9 @@ from smart_trade_backend.api.schemas import (
     ModelTrainingResponse,
     ModelTrainingRunsResponse,
     OperationStatus,
+    PaperRunCreate,
+    PaperRunResponse,
+    PaperStatusResponse,
     SelectedStrategyCreate,
     SelectedStrategySummary,
     StrategiesResponse,
@@ -46,6 +49,11 @@ from smart_trade_backend.application.model_training.service import (
     latest_training_runs,
     train_selected_strategy_models,
     walk_forward_windows_for_model,
+)
+from smart_trade_backend.application.paper.runtime import (
+    PaperRuntimeError,
+    latest_paper_status,
+    run_paper_replay,
 )
 from smart_trade_backend.application.read_models import (
     configuration_summary,
@@ -165,6 +173,19 @@ def get_model_evidence(model_id: str, session: SessionDep) -> dict:
 @router.get("/operation/status", response_model=OperationStatus)
 def get_operation_status(session: SessionDep) -> dict:
     return operation_status(session, get_settings())
+
+
+@router.get("/paper/status", response_model=PaperStatusResponse)
+def get_paper_status(session: SessionDep) -> dict:
+    return latest_paper_status(session, get_settings())
+
+
+@router.post("/paper/runs", response_model=PaperRunResponse, status_code=201)
+def post_paper_run(request: PaperRunCreate, session: SessionDep):
+    try:
+        return run_paper_replay(session, get_settings(), limit=request.limit)
+    except PaperRuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/events", response_model=EventsResponse)

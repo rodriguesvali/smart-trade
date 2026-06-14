@@ -14,7 +14,7 @@ Frontend stack: Angular + PrimeNG.
 
 ## Current Stage
 
-Define phase completed and approved by the Agentic Architect on 2026-06-14. Build phase B0 setup was completed and approved by the Agentic Architect on 2026-06-14. Build phase B1 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B2 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B3 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B4 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B5 was completed and approved by the Agentic Architect on 2026-06-14. QA scenario planning for B0-B8 has been updated with B5 evidence and is pending Agentic Architect review.
+Define phase completed and approved by the Agentic Architect on 2026-06-14. Build phase B0 setup was completed and approved by the Agentic Architect on 2026-06-14. Build phase B1 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B2 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B3 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B4 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B5 was completed and approved by the Agentic Architect on 2026-06-14. Build phase B6 was completed and approved by the Agentic Architect on 2026-06-14. QA scenario planning for B0-B8 has been updated with B6 evidence and is pending Agentic Architect review.
 
 AAMAD files generated from the upstream IDE format were adapted into `.codex/aamad/`. AAMAD Flow should use only the Codex-local files in this repository.
 
@@ -44,4 +44,4 @@ AAMAD files generated from the upstream IDE format were adapted into `.codex/aam
 
 ## Review Gate
 
-B5 gate has been approved by the Agentic Architect. B6 may begin when the Agentic Architect explicitly directs the next Build increment. QA scenario planning remains pending review.
+B6 gate has been approved by the Agentic Architect. B7 may begin when the Agentic Architect explicitly directs the next Build increment. QA scenario planning remains pending review.

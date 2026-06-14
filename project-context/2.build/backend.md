@@ -637,3 +637,91 @@ B5 did not implement:
 - frontend model approval buttons.
 
 B6 must still enforce that every selected-strategy model role has a compatible `APPROVED` or `ACTIVE` model before paper operation can start.
+
+---
+
+# B6 Backend - Paper Inference and Strategy Runtime
+
+Status: Draft for Agentic Architect review  
+Persona: @backend.eng  
+Date: 2026-06-14  
+Source artifacts: `project-context/1.define/prd.md`, `project-context/1.define/sad.md`, `project-context/2.build/build-plan.md`, `project-context/2.build/backend.md`
+
+## 1. Scope Completed
+
+B6 implemented the first paper-only inference and strategy runtime over persisted candles/features. It does not submit live or private exchange orders.
+
+Implemented:
+
+- Paper runtime service for selected strategy and compatible approved/active model role.
+- XGBoost model loader for approved JSON artifacts with `predict_proba` runtime inference.
+- Runtime gates:
+  - selected strategy required;
+  - compatible `APPROVED` or `ACTIVE` model required;
+  - strategy ID/version, model role, asset, timeframe, and feature schema must match.
+- Default strategy runtime behavior:
+  - RSI/IFR oversold entry gate;
+  - model probability confirmation;
+  - spot long-only paper entry;
+  - one position only;
+  - no position scaling;
+  - initial stop loss;
+  - take profit;
+  - break-even/trailing stop movement upward only;
+  - model-confirmation-loss exit while profitable.
+- Simulated persistence:
+  - `strategy_decisions`;
+  - `positions`;
+  - `orders`;
+  - `fills`;
+  - `equity_snapshots`.
+- Idempotent replay behavior: already-decided candles are skipped on later paper runs.
+- Backend API contracts:
+  - `POST /api/paper/runs`;
+  - `GET /api/paper/status`.
+- `START_PAPER` command now runs paper replay or fails auditably.
+- Operation status can report `PAPER_RUNNING` when a compatible model exists and a paper position is open.
+
+## 2. Documentation Consulted
+
+Context7 was consulted before backend implementation:
+
+- XGBoost `/dmlc/xgboost`: `load_model` for JSON artifacts and runtime prediction usage.
+- FastAPI `/fastapi/fastapi`: response models and Pydantic contract patterns.
+
+SQLAlchemy 2.0 docs were previously consulted in B5 for ORM `Session`, `select`, commit, and refresh patterns and remain applicable to B6 persistence.
+
+## 3. Verification
+
+Executed successfully:
+
+```bash
+cd backend
+uv run pytest
+uv run ruff check .
+```
+
+Result:
+
+- `17 passed`.
+- Existing FastAPI/Starlette TestClient deprecation warning remains unchanged.
+- Ruff returned `All checks passed.`
+
+New B6 tests:
+
+- `tests/test_paper_runtime.py::test_paper_runtime_requires_approved_model`
+- `tests/test_paper_runtime.py::test_paper_runtime_creates_long_position_and_simulated_records`
+- `tests/test_paper_runtime.py::test_paper_runtime_is_idempotent_for_processed_candles`
+
+## 4. Intentional Non-Scope
+
+B6 did not implement:
+
+- real private exchange calls;
+- live order submission;
+- seven-day paper readiness evidence;
+- live readiness approval;
+- restart reconciliation against exchange state;
+- frontend controls to start/stop paper operation.
+
+Those remain B7/B8 concerns or later runtime hardening.

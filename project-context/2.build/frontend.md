@@ -317,3 +317,52 @@ Result:
 ## 4. Intentional Non-Scope
 
 B5 frontend did not add buttons to start training or approve models. Those write paths remain backend-mediated API/command contracts for this increment.
+
+---
+
+# B6 Frontend Update - Paper Runtime Visibility
+
+Status: Draft for Agentic Architect review  
+Persona: @frontend.eng  
+Date: 2026-06-14
+
+## 1. Scope Completed
+
+B6 updated the operational console to show backend-mediated paper runtime state.
+
+Implemented:
+
+- Extended typed Angular contracts with `GET /api/paper/status`.
+- Added paper read model to the dashboard aggregate load.
+- Updated the Operation view to show:
+  - paper position status;
+  - quantity;
+  - average entry;
+  - stop loss and take profit;
+  - participating model ID;
+  - latest paper equity;
+  - latest strategy decision and reason;
+  - latest simulated order side/status.
+
+## 2. Documentation Consulted
+
+Context7 was consulted for Angular typed `HttpClient` and dashboard read-model patterns.
+
+PrimeNG MCP was consulted for `Table` component methods; B6 stayed with existing PrimeNG card/tag/table primitives and did not add new component APIs.
+
+## 3. Verification
+
+Executed successfully:
+
+```bash
+npm --prefix frontend run build
+```
+
+Result:
+
+- Angular production build completed successfully.
+- Remaining warnings: initial bundle exceeds the 500 kB warning budget and root component style exceeds the 4 kB warning budget; both remain below error budgets.
+
+## 4. Intentional Non-Scope
+
+B6 frontend did not add start/stop paper controls. Paper operation remains backend-mediated through API/command contracts.

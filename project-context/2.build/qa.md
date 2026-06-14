@@ -11,8 +11,8 @@ This artifact defines the Smart Trade MVP test scenarios from the QA perspective
 
 The scenarios are split into:
 
-- **Executable now**: B0-B5 behavior currently implemented.
-- **Prepared for later increments**: B6-B8 behavior required by PRD/SAD but not implemented yet.
+- **Executable now**: B0-B6 behavior currently implemented.
+- **Prepared for later increments**: B7-B8 behavior required by PRD/SAD but not implemented yet.
 
 QA must not validate with real capital unless the Agentic Architect explicitly approves a live-readiness test window. B8 live tests must be preceded by B6 paper evidence and B7 readiness approval.
 
@@ -26,6 +26,7 @@ Current implemented increments:
 - B3: public CCXT OHLCV ingestion and feature pipeline.
 - B4: strategy plugin contract, default strategy registration, strategy selection gate, frontend strategy requirements visibility.
 - B5: model training, walk-forward validation, holdout backtest, model artifact persistence, and manual approval gate.
+- B6: paper inference/runtime over persisted candles/features with simulated decisions, orders, fills, positions, and equity.
 
 Current automated baseline:
 
@@ -78,7 +79,7 @@ Evidence:
 | QA-B2-002 | Dashboard handles backend unavailable | RF3.5, RNF5.12 | Stop backend, keep frontend running. | UI shows backend unavailable state; no direct fallback to restricted resources. | High |
 | QA-B2-003 | Paper/live mode is visually distinct | RF4.7 | Set mode config to paper/live in controlled environment. | UI clearly displays mode value; live must not imply execution is enabled by UI alone. | High |
 | QA-B2-004 | Registry and log empty states are usable | RF4.6, RF4.9 | Use fresh DB with no events/models. | Tables show empty states without misleading operational readiness. | Medium |
-| QA-B2-005 | Chart placeholder cannot be mistaken for real market evidence | RF4.3, RF4.4 | Inspect operation view before B6 chart data exists. | UI labels placeholder/sample data clearly. | Medium |
+| QA-B2-005 | Chart placeholder cannot be mistaken for real market evidence | RF4.3, RF4.4 | Inspect operation view before backend chart read models exist. | UI labels placeholder/sample data clearly. | Medium |
 
 ## 6. Executable Now - B3 Market Data and Feature Pipeline
 
@@ -156,7 +157,7 @@ Results:
 - XGBoost import: `3.2.0`.
 - Frontend: production build succeeded with known warning-level budgets.
 
-## 9. Prepared for B6 - Paper Inference and Strategy Runtime
+## 9. Executable Now - B6 Paper Inference and Strategy Runtime
 
 | ID | Scenario | Requirements | Steps | Expected Result | Severity |
 | --- | --- | --- | --- | --- | --- |
@@ -170,6 +171,30 @@ Results:
 | QA-B6-008 | Break-even and trailing stop never move protection downward | RF2.5.12-RF2.5.15, AC8.10 | Simulate favorable then adverse movement. | Stop only moves upward for long position after protection activation. | Critical |
 | QA-B6-009 | Loss of confirmation exits according to configured behavior | RF2.5.16, RF2.5.17 | Simulate favorable price then model signal `0`. | Strategy exits or triggers configured protected exit behavior. | High |
 | QA-B6-010 | Restart recovers state without duplicate simulated orders | SAD restart behavior, B6 exit criteria | Stop/restart paper runtime with open/pending state. | State reconstructs from DB; no duplicate order/position records are created. | Critical |
+
+Current B6 automated coverage:
+
+- `tests/test_paper_runtime.py::test_paper_runtime_requires_approved_model`
+  - validates paper runtime blocks without compatible approved/active model.
+- `tests/test_paper_runtime.py::test_paper_runtime_creates_long_position_and_simulated_records`
+  - validates long-only paper position creation, simulated orders/fills/decisions, model traceability, and stop movement.
+- `tests/test_paper_runtime.py::test_paper_runtime_is_idempotent_for_processed_candles`
+  - validates already processed candles are skipped on repeated paper runs and simulated orders are not duplicated.
+
+Current B6 verification evidence:
+
+```bash
+cd backend
+uv run pytest
+uv run ruff check .
+
+npm --prefix frontend run build
+```
+
+Results:
+
+- Backend: `17 passed`, ruff `All checks passed`.
+- Frontend: production build succeeded with known warning-level budgets.
 
 ## 10. Prepared for B7 - Live Readiness Gate
 
@@ -225,9 +250,10 @@ Minimum smoke expectations through B4:
 
 ## 13. Current Residual Risks
 
-- B5 training and approval gates are implemented, including artifact existence/JSON integrity checks, but the runtime inference loader and paper operation loop are not implemented until B6.
+- B5 training and approval gates are implemented, including artifact existence/JSON integrity checks.
+- B6 paper runtime is implemented, but long-running scheduling, seven-day paper readiness evidence, and live readiness are not implemented until B7.
 - Operation remains intentionally blocked without compatible approved/active model evidence.
-- B3 feature no-look-ahead behavior has deterministic coverage but should be expanded with explicit boundary fixtures before B6.
+- B3 feature no-look-ahead behavior has deterministic coverage but should be expanded with explicit boundary fixtures before B7.
 - Frontend selection controls and strategy parameter editing are not implemented in B4; selection is API/command mediated.
 - Live readiness and live execution must remain untested with real capital until B6/B7 evidence is approved.
 
@@ -254,7 +280,7 @@ Result summary:
 
 - Passed: 20
 - Failed: 0
-- Skipped/not executed in Playwright: B6-B8 future scenarios and selected B0-B5 scenarios that require infrastructure fault injection, exchange variability, or service-level runtime-context overrides.
+- Skipped/not executed in Playwright: B7-B8 future scenarios and selected B0-B6 scenarios that require infrastructure fault injection, exchange variability, or service-level runtime-context overrides.
 
 Executed scenarios:
 
@@ -286,22 +312,22 @@ Not executed in this Playwright run:
 - QA-B0-002: DB unavailable/failure injection should be run as a process-startup fault test.
 - QA-B2-004: partial empty-state coverage remains from backend API tests; full UI empty-registry state is superseded by B4 startup strategy registration.
 - QA-B3-001, QA-B3-002, QA-B3-003: covered by existing backend automated tests and previous smoke; not repeated in Playwright to avoid external public exchange variability.
-- QA-B3-004: should be expanded as deterministic service-level fixture before B6.
+- QA-B3-004: should be expanded as deterministic service-level fixture before B7.
 - QA-B3-006, QA-B3-007: require exchange adapter fault injection and credential-environment assertions.
 - QA-B4-006: requires either multiple compatible strategy fixtures or DB-level assertion of deselection history.
 - QA-B4-008: requires service-level runtime-context override for non-spot/non-long-only/non-`1m` compatibility.
-- B5 UI scenarios were not rerun in Playwright after implementation; current B5 evidence is backend automated tests, migration checks, XGBoost import, and Angular production build.
-- B6-B8 scenarios: pending future implementation.
+- B5/B6 UI scenarios were not rerun in Playwright after implementation; current evidence is backend automated tests, migration checks where applicable, XGBoost import, and Angular production build.
+- B7-B8 scenarios: pending future implementation.
 
 ## 15. Review Checklist for Agentic Architect
 
 - Confirm scenario coverage matches MVP scope and does not introduce out-of-scope trading behavior.
-- Confirm B6-B8 planned scenarios are acceptable as future gate criteria.
-- Confirm whether QA should now implement additional Playwright coverage for B5 model evidence views before B6 begins.
+- Confirm B7-B8 planned scenarios are acceptable as future gate criteria.
+- Confirm whether QA should now implement additional Playwright coverage for B5/B6 model and paper evidence views before B7 begins.
 
 ## 16. Audit
 
 - Generated by: @qa.eng
-- Action: Updated QA scenario matrix for implemented B0-B5 and planned B6-B8 safety gates.
+- Action: Updated QA scenario matrix for implemented B0-B6 and planned B7-B8 safety gates.
 - Date: 2026-06-14
 - Review status: Pending Agentic Architect review.

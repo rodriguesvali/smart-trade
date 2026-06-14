@@ -106,6 +106,71 @@ export interface OperationStatus {
   blockers: string[];
 }
 
+export interface PaperPositionSummary {
+  id: number;
+  asset_symbol: string;
+  status: string;
+  side: string;
+  quantity: string;
+  average_entry_price: string;
+  stop_loss_price: string | null;
+  take_profit_price: string | null;
+  opened_at: string;
+  closed_at: string | null;
+  close_reason: string | null;
+  strategy_id: string;
+  strategy_version: string;
+  model_refs: Record<string, unknown>[];
+}
+
+export interface PaperEquitySummary {
+  id: number;
+  asset_symbol: string;
+  equity_usd: string;
+  cash_usd: string;
+  position_value_usd: string;
+  snapshot_at: string;
+  source: string;
+}
+
+export interface PaperDecisionSummary {
+  id: number;
+  strategy_id: string;
+  strategy_version: string;
+  asset_symbol: string;
+  timeframe: string;
+  action: string;
+  reason: string;
+  confidence: string | null;
+  participating_models: Record<string, unknown>[];
+  risk_updates: Record<string, unknown>;
+  decided_at: string;
+}
+
+export interface PaperOrderSummary {
+  id: number;
+  client_order_id: string;
+  exchange_order_id: string | null;
+  position_id: number | null;
+  decision_id: number | null;
+  asset_symbol: string;
+  side: string;
+  order_type: string;
+  status: string;
+  requested_quantity: string;
+  requested_price: string | null;
+  submitted_at: string | null;
+  raw_request: Record<string, unknown>;
+  raw_response: Record<string, unknown>;
+}
+
+export interface PaperStatusResponse {
+  open_position: PaperPositionSummary | null;
+  latest_equity: PaperEquitySummary | null;
+  recent_decisions: PaperDecisionSummary[];
+  recent_orders: PaperOrderSummary[];
+}
+
 export interface OperationalEvent {
   id: number;
   event_type: string;
@@ -171,6 +236,7 @@ export interface OperatorReadModels {
   events: EventsResponse;
   marketData: MarketDataStatus;
   trainingRuns: ModelTrainingRunsResponse;
+  paper: PaperStatusResponse;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -190,6 +256,7 @@ export class OperatorApi {
       events: this.http.get<EventsResponse>(`/api/events?limit=${eventLimit}`),
       marketData: this.http.get<MarketDataStatus>('/api/data/status'),
       trainingRuns: this.http.get<ModelTrainingRunsResponse>('/api/models/training-runs'),
+      paper: this.http.get<PaperStatusResponse>('/api/paper/status'),
     });
   }
 }

@@ -132,19 +132,48 @@
               <dl>
                 <div>
                   <dt>Status</dt>
-                  <dd>{{ (readModels()?.operation?.open_positions ?? 0) > 0 ? 'OPEN' : 'FLAT' }}</dd>
+                  <dd>{{ readModels()?.paper?.open_position?.status || 'FLAT' }}</dd>
                 </div>
                 <div>
-                  <dt>Unrealized PnL</dt>
-                  <dd>Unavailable</dd>
+                  <dt>Quantity</dt>
+                  <dd>{{ readModels()?.paper?.open_position?.quantity || 'Unavailable' }}</dd>
                 </div>
                 <div>
-                  <dt>Latest inference</dt>
-                  <dd>Unavailable</dd>
+                  <dt>Average entry</dt>
+                  <dd>{{ readModels()?.paper?.open_position?.average_entry_price || 'Unavailable' }}</dd>
                 </div>
                 <div>
-                  <dt>RSI/IFR</dt>
-                  <dd>Unavailable</dd>
+                  <dt>Stop / Take profit</dt>
+                  <dd>
+                    {{ readModels()?.paper?.open_position?.stop_loss_price || 'Unavailable' }}
+                    /
+                    {{ readModels()?.paper?.open_position?.take_profit_price || 'Unavailable' }}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Model</dt>
+                  <dd>{{ modelRefLabel() }}</dd>
+                </div>
+              </dl>
+            </p-card>
+
+            <p-card header="Paper Runtime">
+              <dl>
+                <div>
+                  <dt>Equity</dt>
+                  <dd>{{ readModels()?.paper?.latest_equity?.equity_usd || 'Unavailable' }} USD</dd>
+                </div>
+                <div>
+                  <dt>Latest decision</dt>
+                  <dd>{{ latestPaperDecision()?.action || 'Unavailable' }}</dd>
+                </div>
+                <div>
+                  <dt>Decision reason</dt>
+                  <dd>{{ latestPaperDecision()?.reason || 'Unavailable' }}</dd>
+                </div>
+                <div>
+                  <dt>Latest order</dt>
+                  <dd>{{ latestPaperOrder()?.side || 'None' }} {{ latestPaperOrder()?.status || '' }}</dd>
                 </div>
               </dl>
             </p-card>

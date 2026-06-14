@@ -122,6 +122,12 @@ export class App implements OnInit {
   protected readonly latestModel = computed(() => {
     return this.readModels()?.models.items[0] ?? null;
   });
+  protected readonly latestPaperDecision = computed(() => {
+    return this.readModels()?.paper.recent_decisions[0] ?? null;
+  });
+  protected readonly latestPaperOrder = computed(() => {
+    return this.readModels()?.paper.recent_orders[0] ?? null;
+  });
 
   ngOnInit(): void {
     this.refresh();
@@ -157,6 +163,14 @@ export class App implements OnInit {
       return Number.isInteger(value) ? String(value) : value.toFixed(4);
     }
     return String(value);
+  }
+
+  protected modelRefLabel(): string {
+    const modelRef = this.readModels()?.paper.open_position?.model_refs?.[0];
+    if (!modelRef) {
+      return 'Unavailable';
+    }
+    return String(modelRef['model_id'] ?? 'Unavailable');
   }
 
   private refreshReadModels(): void {

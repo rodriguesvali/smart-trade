@@ -167,6 +167,92 @@ class OperationStatus(BaseModel):
     blockers: list[str]
 
 
+class PaperRunCreate(BaseModel):
+    limit: int = Field(default=500, ge=1, le=5000)
+
+
+class PaperRunResponse(BaseModel):
+    processed_candles: int
+    decisions_created: int
+    orders_created: int
+    fills_created: int
+    equity_snapshots_created: int
+    open_position_id: int | None
+
+
+class PaperPositionSummary(BaseModel):
+    id: int
+    asset_symbol: str
+    status: str
+    side: str
+    quantity: Decimal
+    average_entry_price: Decimal
+    stop_loss_price: Decimal | None
+    take_profit_price: Decimal | None
+    opened_at: datetime
+    closed_at: datetime | None
+    close_reason: str | None
+    strategy_id: str
+    strategy_version: str
+    model_refs: list[dict[str, Any]]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PaperEquitySummary(BaseModel):
+    id: int
+    asset_symbol: str
+    equity_usd: Decimal
+    cash_usd: Decimal
+    position_value_usd: Decimal
+    snapshot_at: datetime
+    source: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PaperDecisionSummary(BaseModel):
+    id: int
+    strategy_id: str
+    strategy_version: str
+    asset_symbol: str
+    timeframe: str
+    action: str
+    reason: str
+    confidence: Decimal | None
+    participating_models: list[dict[str, Any]]
+    risk_updates: dict[str, Any]
+    decided_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PaperOrderSummary(BaseModel):
+    id: int
+    client_order_id: str
+    exchange_order_id: str | None
+    position_id: int | None
+    decision_id: int | None
+    asset_symbol: str
+    side: str
+    order_type: str
+    status: str
+    requested_quantity: Decimal
+    requested_price: Decimal | None
+    submitted_at: datetime | None
+    raw_request: dict[str, Any]
+    raw_response: dict[str, Any]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PaperStatusResponse(BaseModel):
+    open_position: PaperPositionSummary | None
+    latest_equity: PaperEquitySummary | None
+    recent_decisions: list[PaperDecisionSummary]
+    recent_orders: list[PaperOrderSummary]
+
+
 class OperationalEvent(BaseModel):
     id: int
     event_type: str

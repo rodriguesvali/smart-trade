@@ -8,6 +8,7 @@ from smart_trade_backend.application.model_training.service import (
     ModelApprovalError,
     approve_model,
 )
+from smart_trade_backend.application.paper.runtime import PaperRuntimeError, run_paper_replay
 from smart_trade_backend.application.strategy.registry import (
     StrategySelectionError,
     select_strategy,
@@ -15,10 +16,11 @@ from smart_trade_backend.application.strategy.registry import (
 from smart_trade_backend.config import Settings
 from smart_trade_backend.domain.enums import CommandStatus, CommandType
 
-SUPPORTED_B1_COMMANDS = {
+SUPPORTED_COMMANDS = {
     CommandType.RETRAIN_MODEL,
     CommandType.SELECT_STRATEGY,
     CommandType.APPROVE_MODEL,
+    CommandType.START_PAPER,
 }
 
 
@@ -32,9 +34,9 @@ def create_command_request(
 ) -> CommandRequestRecord:
     status = CommandStatus.REQUESTED
     result: dict[str, Any] = {}
-    if command_type not in SUPPORTED_B1_COMMANDS:
+    if command_type not in SUPPORTED_COMMANDS:
         status = CommandStatus.REJECTED
-        result = {"reason": "Command type is not enabled in B1."}
+        result = {"reason": "Command type is not enabled."}
     elif command_type == CommandType.SELECT_STRATEGY and settings is not None:
         try:
             selected = select_strategy(
@@ -62,6 +64,26 @@ def create_command_request(
         else:
             status = CommandStatus.COMPLETED
             result = {"model_id": approved.model_id, "status": approved.status}
+    elif command_type == CommandType.START_PAPER and settings is not None:
+        try:
+            paper_run = run_paper_replay(
+                session,
+                settings,
+                limit=int(payload.get("limit", 500)),
+            )
+        except (TypeError, ValueError, PaperRuntimeError) as exc:
+            status = CommandStatus.FAILED
+            result = {"reason": str(exc)}
+        else:
+            status = CommandStatus.COMPLETED
+            result = {
+                "processed_candles": paper_run.processed_candles,
+                "decisions_created": paper_run.decisions_created,
+                "orders_created": paper_run.orders_created,
+                "fills_created": paper_run.fills_created,
+                "equity_snapshots_created": paper_run.equity_snapshots_created,
+                "open_position_id": paper_run.open_position_id,
+            }
 
     record = CommandRequestRecord(
         command_type=command_type.value,

@@ -122,6 +122,8 @@ def operation_status(session: Session, settings: Settings) -> dict[str, Any]:
     state = OperationState.IDLE
     if blockers:
         state = OperationState.NOT_READY
+    elif open_positions_count:
+        state = OperationState.PAPER_RUNNING
 
     return {
         "state": state.value,
