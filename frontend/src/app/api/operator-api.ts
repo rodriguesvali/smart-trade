@@ -89,12 +89,56 @@ export interface EventsResponse {
   items: OperationalEvent[];
 }
 
+export interface FeatureSchemaSummary {
+  schema_id: string;
+  name: string;
+  version: string;
+  timeframe: string;
+  features: string[];
+  parameters: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface DataIngestionRunSummary {
+  id: number;
+  exchange: string;
+  symbol: string;
+  timeframe: string;
+  status: string;
+  started_at: string;
+  completed_at: string | null;
+  since_ms: number | null;
+  until_ms: number | null;
+  requested_limit: number | null;
+  fetched_count: number;
+  inserted_count: number;
+  feature_rows_upserted: number;
+  first_open_time_ms: number | null;
+  last_open_time_ms: number | null;
+  error_message: string | null;
+}
+
+export interface MarketDataStatus {
+  exchange: string;
+  symbol: string;
+  timeframe: string;
+  candle_count: number;
+  feature_count: number;
+  latest_candle_opened_at: string | null;
+  latest_candle_open_time_ms: number | null;
+  latest_feature_opened_at: string | null;
+  latest_feature_schema_id: string | null;
+  feature_schemas: FeatureSchemaSummary[];
+  latest_ingestion_run: DataIngestionRunSummary | null;
+}
+
 export interface OperatorReadModels {
   configuration: ConfigurationSummary;
   strategies: StrategiesResponse;
   models: ModelsResponse;
   operation: OperationStatus;
   events: EventsResponse;
+  marketData: MarketDataStatus;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -112,6 +156,7 @@ export class OperatorApi {
       models: this.http.get<ModelsResponse>('/api/models'),
       operation: this.http.get<OperationStatus>('/api/operation/status'),
       events: this.http.get<EventsResponse>(`/api/events?limit=${eventLimit}`),
+      marketData: this.http.get<MarketDataStatus>('/api/data/status'),
     });
   }
 }

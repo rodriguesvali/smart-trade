@@ -1,16 +1,36 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
+from smart_trade_backend.adapters.exchange.ccxt_public import (
+    CcxtPublicMarketDataAdapter,
+    CcxtUnavailableError,
+)
+from smart_trade_backend.adapters.features.talib import (
+    TalibFeatureCalculator,
+    TalibUnavailableError,
+)
 from smart_trade_backend.api.dependencies import SessionDep
 from smart_trade_backend.api.schemas import (
+    CandlesResponse,
     CommandRequestCreate,
     CommandRequestSummary,
     ConfigurationSummary,
+    DataIngestionRunSummary,
     EventsResponse,
+    FeatureGenerationResponse,
+    IngestionRunCreate,
+    MarketDataStatus,
     ModelsResponse,
     OperationStatus,
     StrategiesResponse,
 )
 from smart_trade_backend.application.commands import create_command_request
+from smart_trade_backend.application.market_data.features import PythonFallbackFeatureCalculator
+from smart_trade_backend.application.market_data.ingestion import (
+    collect_historical_candles,
+    generate_features_for_market,
+    latest_candles,
+    market_data_status,
+)
 from smart_trade_backend.application.read_models import (
     configuration_summary,
     get_selected_strategy,
@@ -65,6 +85,49 @@ def get_events(session: SessionDep, limit: int = Query(default=50, ge=1, le=200)
     return {"items": latest_events(session, limit)}
 
 
+@router.get("/data/status", response_model=MarketDataStatus)
+def get_market_data_status(session: SessionDep) -> dict:
+    return market_data_status(session, get_settings())
+
+
+@router.get("/data/candles", response_model=CandlesResponse)
+def get_candles(session: SessionDep, limit: int = Query(default=200, ge=1, le=1000)) -> dict:
+    return {"items": latest_candles(session, get_settings(), limit=limit)}
+
+
+@router.post("/data/ingestion-runs", response_model=DataIngestionRunSummary, status_code=201)
+def post_data_ingestion_run(request: IngestionRunCreate, session: SessionDep):
+    settings = get_settings()
+    try:
+        result = collect_historical_candles(
+            session,
+            settings,
+            CcxtPublicMarketDataAdapter(exchange_id=settings.exchange),
+            since_ms=request.since_ms,
+            limit=request.limit,
+            page_size=request.page_size,
+            feature_calculator=_feature_calculator(),
+        )
+    except CcxtUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except TalibUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return result.run
+
+
+@router.post("/data/features/generate", response_model=FeatureGenerationResponse)
+def post_feature_generation(session: SessionDep) -> dict:
+    try:
+        feature_rows_upserted = generate_features_for_market(
+            session,
+            settings=get_settings(),
+            feature_calculator=_feature_calculator(),
+        )
+    except TalibUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"feature_rows_upserted": feature_rows_upserted}
+
+
 @router.post("/commands", response_model=CommandRequestSummary, status_code=201)
 def post_command(request: CommandRequestCreate, session: SessionDep):
     return create_command_request(
@@ -73,3 +136,12 @@ def post_command(request: CommandRequestCreate, session: SessionDep):
         requested_by=request.requested_by,
         payload=request.payload,
     )
+
+
+def _feature_calculator():
+    try:
+        import numpy  # noqa: F401
+        import talib  # noqa: F401
+    except ImportError:
+        return PythonFallbackFeatureCalculator()
+    return TalibFeatureCalculator()

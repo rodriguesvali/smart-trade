@@ -1,3 +1,4 @@
+import { DatePipe } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
@@ -10,7 +11,15 @@ import { ModelsViewComponent } from './models-view.component';
 
 @Component({
   selector: 'app-root',
-  imports: [ButtonModule, CardModule, EventsViewComponent, ModelsViewComponent, TagModule, TradeChartComponent],
+  imports: [
+    ButtonModule,
+    CardModule,
+    DatePipe,
+    EventsViewComponent,
+    ModelsViewComponent,
+    TagModule,
+    TradeChartComponent,
+  ],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -86,6 +95,26 @@ export class App implements OnInit {
       return `${blockers} blocker${blockers > 1 ? 's' : ''}`;
     }
     return 'Gate clear';
+  });
+  protected readonly dataAvailabilitySeverity = computed(() => {
+    const marketData = this.readModels()?.marketData;
+    if (!marketData || marketData.candle_count === 0) {
+      return 'warn';
+    }
+    if (marketData.feature_count === 0) {
+      return 'info';
+    }
+    return 'success';
+  });
+  protected readonly dataAvailabilityLabel = computed(() => {
+    const marketData = this.readModels()?.marketData;
+    if (!marketData || marketData.candle_count === 0) {
+      return 'No candles';
+    }
+    if (marketData.feature_count === 0) {
+      return 'Candles only';
+    }
+    return 'Features ready';
   });
 
   ngOnInit(): void {

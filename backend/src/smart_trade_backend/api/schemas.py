@@ -110,3 +110,76 @@ class CommandRequestSummary(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+class FeatureSchemaSummary(BaseModel):
+    schema_id: str
+    name: str
+    version: str
+    timeframe: str
+    features: list[str]
+    parameters: dict[str, Any]
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DataIngestionRunSummary(BaseModel):
+    id: int
+    exchange: str
+    symbol: str
+    timeframe: str
+    status: str
+    started_at: datetime
+    completed_at: datetime | None
+    since_ms: int | None
+    until_ms: int | None
+    requested_limit: int | None
+    fetched_count: int
+    inserted_count: int
+    feature_rows_upserted: int
+    first_open_time_ms: int | None
+    last_open_time_ms: int | None
+    error_message: str | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MarketDataStatus(BaseModel):
+    exchange: str
+    symbol: str
+    timeframe: str
+    candle_count: int
+    feature_count: int
+    latest_candle_opened_at: datetime | None
+    latest_candle_open_time_ms: int | None
+    latest_feature_opened_at: datetime | None
+    latest_feature_schema_id: str | None
+    feature_schemas: list[FeatureSchemaSummary]
+    latest_ingestion_run: DataIngestionRunSummary | None
+
+
+class CandleSummary(BaseModel):
+    open_time_ms: int
+    opened_at: datetime
+    open: Decimal
+    high: Decimal
+    low: Decimal
+    close: Decimal
+    volume: Decimal
+    is_closed: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CandlesResponse(BaseModel):
+    items: list[CandleSummary]
+
+
+class IngestionRunCreate(BaseModel):
+    since_ms: int | None = Field(default=None, ge=0)
+    limit: int | None = Field(default=None, ge=1, le=5000)
+    page_size: int = Field(default=200, ge=1, le=1000)
+
+
+class FeatureGenerationResponse(BaseModel):
+    feature_rows_upserted: int

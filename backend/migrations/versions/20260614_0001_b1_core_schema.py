@@ -15,13 +15,28 @@ down_revision = None
 branch_labels = None
 depends_on = None
 
+B1_TABLES = (
+    "asset_configurations",
+    "strategy_registry",
+    "selected_strategies",
+    "model_registry",
+    "strategy_decisions",
+    "positions",
+    "orders",
+    "fills",
+    "equity_snapshots",
+    "command_requests",
+    "operational_events",
+)
+
 
 def upgrade() -> None:
     bind = op.get_bind()
-    Base.metadata.create_all(bind=bind)
+    for table_name in B1_TABLES:
+        Base.metadata.tables[table_name].create(bind=bind, checkfirst=True)
 
 
 def downgrade() -> None:
     bind = op.get_bind()
-    Base.metadata.drop_all(bind=bind)
-
+    for table_name in reversed(B1_TABLES):
+        Base.metadata.tables[table_name].drop(bind=bind, checkfirst=True)

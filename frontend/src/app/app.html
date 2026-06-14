@@ -183,17 +183,47 @@
 
       @case ('training') {
         <section class="console-grid training-grid">
-          <p-card header="Training Pipeline">
-            <div class="placeholder-list">
+          <p-card header="Data Pipeline">
+            <div class="data-summary">
+              <article>
+                <span>Candles</span>
+                <strong>{{ readModels()?.marketData?.candle_count ?? 0 }}</strong>
+              </article>
+              <article>
+                <span>Feature rows</span>
+                <strong>{{ readModels()?.marketData?.feature_count ?? 0 }}</strong>
+              </article>
+              <article>
+                <span>Latest candle</span>
+                <strong>
+                  {{ readModels()?.marketData?.latest_candle_opened_at ? (readModels()?.marketData?.latest_candle_opened_at | date:'short') : 'Unavailable' }}
+                </strong>
+              </article>
+              <article>
+                <span>Latest schema</span>
+                <strong>{{ readModels()?.marketData?.latest_feature_schema_id || 'Unavailable' }}</strong>
+              </article>
+            </div>
+
+            <div class="pipeline-status">
+              <p-tag [severity]="dataAvailabilitySeverity()" [value]="dataAvailabilityLabel()" />
+              @if (readModels()?.marketData?.latest_ingestion_run; as run) {
+                <span>Last ingestion {{ run.status }}: {{ run.fetched_count }} fetched, {{ run.inserted_count }} inserted, {{ run.feature_rows_upserted }} feature rows.</span>
+              } @else {
+                <span>No ingestion run has been recorded.</span>
+              }
+            </div>
+
+            <div class="placeholder-list pipeline-list">
               <article>
                 <i class="pi pi-history" aria-hidden="true"></i>
                 <strong>Historical data</strong>
-                <span>Unavailable until B3 data collection APIs are implemented.</span>
+                <span>{{ (readModels()?.marketData?.candle_count ?? 0) > 0 ? 'M1 candles are persisted and resumable.' : 'Awaiting first B3 ingestion run.' }}</span>
               </article>
               <article>
                 <i class="pi pi-sliders-h" aria-hidden="true"></i>
                 <strong>Feature schema</strong>
-                <span>Unavailable until B3 feature generation APIs are implemented.</span>
+                <span>{{ readModels()?.marketData?.latest_feature_schema_id || 'Awaiting generated feature rows.' }}</span>
               </article>
               <article>
                 <i class="pi pi-sitemap" aria-hidden="true"></i>

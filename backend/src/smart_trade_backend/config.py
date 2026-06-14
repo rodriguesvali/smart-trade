@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     timeframe: str = "1m"
     initial_capital_usd: float = 1000.0
     mode: str = "paper"
+    historical_ingestion_limit: int = 1000
+    historical_ingestion_page_size: int = 200
+    candle_retention_days: int = 120
+    feature_retention_days: int = 120
 
     model_config = SettingsConfigDict(
         env_file=".env",

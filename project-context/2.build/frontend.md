@@ -152,3 +152,62 @@ Recommended next step after Agentic Architect approval: B3.
 `@qa.eng`:
 
 - Validate B2 build, backend contract compatibility, frontend empty states, and absence of unsafe command/exchange/credential paths.
+
+---
+
+# B3 Frontend Update - Data Pipeline Visibility
+
+Status: Draft for Agentic Architect review  
+Persona: @frontend.eng  
+Date: 2026-06-14
+
+## 1. Scope Completed
+
+B3 updated the operational console to consume backend data pipeline status.
+
+Implemented:
+
+- Added typed Angular contract for `GET /api/data/status`.
+- Included market data status in the dashboard read-model load.
+- Replaced B2 Training placeholders for historical data and feature schema with real status values:
+  - persisted candle count;
+  - generated feature row count;
+  - latest candle timestamp;
+  - latest feature schema ID;
+  - latest ingestion run status and row counts.
+
+## 2. Documentation Consulted
+
+Context7 was consulted for Angular standalone component, `HttpClient`, signals, and template control-flow guidance.
+
+PrimeNG MCP was consulted for:
+
+- `Card`;
+- `Tag`;
+- `ProgressBar` applicability. B3 did not add `ProgressBar`; the UI stayed with compact data panels and tags.
+
+## 3. Verification
+
+Executed successfully:
+
+```bash
+npm --prefix frontend run build
+```
+
+Result:
+
+- Angular production build completed successfully.
+- Remaining warnings: initial bundle exceeds the 500 kB warning budget but remains below the 1 MB error budget; root component style exceeds the 4 kB warning budget but remains below the 8 kB error budget.
+
+Runtime smoke checks:
+
+- `GET http://127.0.0.1:4200/api/data/status`
+- `HEAD http://127.0.0.1:4200/`
+
+Playwright screenshot:
+
+- `/tmp/smart-trade-b3-operation.png`
+
+## 4. Intentional Non-Scope
+
+B3 did not replace the operation chart's local placeholder data. Real operational chart markers/equity remain tied to later B6 paper-operation read models.

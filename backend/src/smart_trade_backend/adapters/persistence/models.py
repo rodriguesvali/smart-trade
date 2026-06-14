@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     DateTime,
     ForeignKey,
@@ -113,6 +114,115 @@ class ModelRegistryRecord(TimestampMixin, Base):
     __table_args__ = (
         Index("ix_model_registry_status", "status"),
         Index("ix_model_registry_compatibility", "strategy_id", "strategy_version", "model_role"),
+    )
+
+
+class CandleRecord(TimestampMixin, Base):
+    __tablename__ = "candles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    exchange: Mapped[str] = mapped_column(String(64), nullable=False)
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    timeframe: Mapped[str] = mapped_column(String(16), nullable=False)
+    open_time_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    open: Mapped[Decimal] = mapped_column(Numeric(28, 12), nullable=False)
+    high: Mapped[Decimal] = mapped_column(Numeric(28, 12), nullable=False)
+    low: Mapped[Decimal] = mapped_column(Numeric(28, 12), nullable=False)
+    close: Mapped[Decimal] = mapped_column(Numeric(28, 12), nullable=False)
+    volume: Mapped[Decimal] = mapped_column(Numeric(28, 12), nullable=False)
+    source: Mapped[str] = mapped_column(String(64), nullable=False)
+    is_closed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    raw_payload: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "exchange",
+            "symbol",
+            "timeframe",
+            "open_time_ms",
+            name="uq_candles_market_time",
+        ),
+        Index("ix_candles_market_time", "exchange", "symbol", "timeframe", "open_time_ms"),
+        Index("ix_candles_opened_at", "opened_at"),
+    )
+
+
+class FeatureSchemaRecord(TimestampMixin, Base):
+    __tablename__ = "feature_schemas"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    schema_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    version: Mapped[str] = mapped_column(String(64), nullable=False)
+    timeframe: Mapped[str] = mapped_column(String(16), nullable=False)
+    features: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    parameters: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+
+    __table_args__ = (Index("ix_feature_schemas_identity", "name", "version"),)
+
+
+class CandleFeatureRecord(TimestampMixin, Base):
+    __tablename__ = "candle_features"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    exchange: Mapped[str] = mapped_column(String(64), nullable=False)
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    timeframe: Mapped[str] = mapped_column(String(16), nullable=False)
+    feature_schema_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    open_time_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    candle_opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    values: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "exchange",
+            "symbol",
+            "timeframe",
+            "feature_schema_id",
+            "open_time_ms",
+            name="uq_candle_features_market_schema_time",
+        ),
+        Index(
+            "ix_candle_features_market_schema_time",
+            "exchange",
+            "symbol",
+            "timeframe",
+            "feature_schema_id",
+            "open_time_ms",
+        ),
+    )
+
+
+class DataIngestionRunRecord(TimestampMixin, Base):
+    __tablename__ = "data_ingestion_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    exchange: Mapped[str] = mapped_column(String(64), nullable=False)
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    timeframe: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    since_ms: Mapped[int | None] = mapped_column(BigInteger)
+    until_ms: Mapped[int | None] = mapped_column(BigInteger)
+    requested_limit: Mapped[int | None] = mapped_column(Integer)
+    fetched_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    inserted_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    feature_rows_upserted: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    first_open_time_ms: Mapped[int | None] = mapped_column(BigInteger)
+    last_open_time_ms: Mapped[int | None] = mapped_column(BigInteger)
+    error_message: Mapped[str | None] = mapped_column(Text)
+
+    __table_args__ = (
+        Index(
+            "ix_data_ingestion_runs_market_started",
+            "exchange",
+            "symbol",
+            "timeframe",
+            "started_at",
+        ),
+        Index("ix_data_ingestion_runs_status", "status"),
     )
 
 
