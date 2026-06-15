@@ -11,12 +11,10 @@
       "isBackground": true,
       "problemMatcher": {
         "owner": "python",
-        "pattern": [
-          {
-            "regexp": "^(.*)$",
-            "message": 1
-          }
-        ],
+        "pattern": {
+          "regexp": "^(.*)$",
+          "message": 1
+        },
         "background": {
           "activeOnStart": true,
           "beginsPattern": "Uvicorn running on|Started reloader process",

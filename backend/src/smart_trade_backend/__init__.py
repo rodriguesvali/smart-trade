@@ -1,1 +1,0 @@
-"""Smart Trade backend package."""

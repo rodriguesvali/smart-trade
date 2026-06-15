@@ -1,1 +1,0 @@
-"""Strategy application services."""
