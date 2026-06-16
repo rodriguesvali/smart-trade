@@ -65,6 +65,13 @@ class TrainingRunRead(BaseModel):
     failure_reason: str | None
     created_at: datetime
     model_id: str | None = None
+    auto_validate: bool
+    progress_phase: str | None = None
+    progress_pct: float | None = None
+    progress_message: str | None = None
+    worker_id: str | None = None
+    locked_at: datetime | None = None
+    heartbeat_at: datetime | None = None
 
 
 class TrainedModelSummary(BaseModel):

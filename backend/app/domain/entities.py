@@ -37,12 +37,29 @@ class TrainingRun:
     failure_reason: str | None = None
     created_at: datetime | None = None
     model_id: str | None = None
+    auto_validate: bool = False
+    progress_phase: str | None = None
+    progress_pct: float | None = None
+    progress_message: str | None = None
+    worker_id: str | None = None
+    locked_at: datetime | None = None
+    heartbeat_at: datetime | None = None
 
-    def mark_running(self, timestamp: datetime) -> None:
+    def mark_running(self, timestamp: datetime, worker_id: str | None = None) -> None:
         if self.status != TrainingRunStatus.PENDING:
             raise InvalidStateTransitionError("Only PENDING training runs can start")
         self.status = TrainingRunStatus.RUNNING
         self.started_at = timestamp
+        self.locked_at = timestamp
+        self.heartbeat_at = timestamp
+        self.worker_id = worker_id
+        self.update_progress(timestamp, "training_started", 0.05, "Training run claimed by worker")
+
+    def update_progress(self, timestamp: datetime, phase: str, pct: float, message: str | None = None) -> None:
+        self.progress_phase = phase
+        self.progress_pct = max(0.0, min(1.0, pct))
+        self.progress_message = message
+        self.heartbeat_at = timestamp
 
     def mark_trained(self, timestamp: datetime, model_id: str) -> None:
         if self.status != TrainingRunStatus.RUNNING:
@@ -50,11 +67,13 @@ class TrainingRun:
         self.status = TrainingRunStatus.TRAINED
         self.finished_at = timestamp
         self.model_id = model_id
+        self.update_progress(timestamp, "trained", 1.0, "Training completed")
 
     def mark_failed(self, timestamp: datetime, reason: str) -> None:
         self.status = TrainingRunStatus.FAILED
         self.finished_at = timestamp
         self.failure_reason = reason
+        self.update_progress(timestamp, "failed", 1.0, reason)
 
 
 @dataclass

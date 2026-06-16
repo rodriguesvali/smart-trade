@@ -47,7 +47,7 @@ def get_strategy(strategy_id: str, use_cases: TrainingUseCases = Depends(get_use
         raise _http_error(exc) from exc
 
 
-@router.post("/strategies/{strategy_id}/training-runs", response_model=TrainingRunRead, tags=["training"])
+@router.post("/strategies/{strategy_id}/training-runs", response_model=TrainingRunRead, status_code=202, tags=["training"])
 def create_training_run(
     strategy_id: str,
     request: TrainingRequest,
@@ -168,6 +168,13 @@ def _run_read(run: TrainingRun) -> TrainingRunRead:
         failure_reason=run.failure_reason,
         created_at=run.created_at,
         model_id=run.model_id,
+        auto_validate=run.auto_validate,
+        progress_phase=run.progress_phase,
+        progress_pct=run.progress_pct,
+        progress_message=run.progress_message,
+        worker_id=run.worker_id,
+        locked_at=run.locked_at,
+        heartbeat_at=run.heartbeat_at,
     )
 
 

@@ -11,6 +11,7 @@ from app.domain.exceptions import ValidationError
 
 
 MAX_PAGE_LIMIT = 500
+BINANCE_SENTIMENT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
 
 
 class CcxtSentimentDataProvider:
@@ -28,6 +29,7 @@ class CcxtSentimentDataProvider:
         ccxt_timeframe = _sentiment_timeframe(timeframe)
         since_ms = _to_ms(since)
         until_ms = _to_ms(until)
+        _ensure_supported_sentiment_window(exchange_id, since_ms, until_ms, ccxt_timeframe)
 
         if not exchange.has.get("fetchOpenInterestHistory"):
             raise ValidationError(f"Exchange {exchange_id} does not support open interest history through CCXT")
@@ -101,12 +103,12 @@ def _fetch_taker_buy_sell_ratio(
         )
     raw_symbol = _contract_symbol_id(symbol)
     return _fetch_paginated(
-        fetch_page=lambda until_cursor: exchange.fapidata_get_takerlongshortratio(
+        fetch_page=lambda page_since, page_until: exchange.fapidata_get_takerlongshortratio(
             {
                 "symbol": raw_symbol,
                 "period": timeframe,
-                "startTime": since_ms,
-                "endTime": until_cursor,
+                "startTime": page_since,
+                "endTime": page_until,
                 "limit": MAX_PAGE_LIMIT,
             }
         ),
@@ -126,12 +128,12 @@ def _fetch_open_interest_history(
     until_ms: int,
 ) -> list[dict]:
     return _fetch_paginated(
-        fetch_page=lambda until_cursor: exchange.fetch_open_interest_history(
+        fetch_page=lambda page_since, page_until: exchange.fetch_open_interest_history(
             symbol,
             timeframe,
-            since_ms,
+            page_since,
             MAX_PAGE_LIMIT,
-            {"until": until_cursor},
+            {"until": page_until},
         ),
         since_ms=since_ms,
         until_ms=until_ms,
@@ -149,12 +151,12 @@ def _fetch_long_short_ratio_history(
     until_ms: int,
 ) -> list[dict]:
     return _fetch_paginated(
-        fetch_page=lambda until_cursor: exchange.fetch_long_short_ratio_history(
+        fetch_page=lambda page_since, page_until: exchange.fetch_long_short_ratio_history(
             symbol,
             timeframe,
-            since_ms,
+            page_since,
             MAX_PAGE_LIMIT,
-            {"until": until_cursor},
+            {"until": page_until},
         ),
         since_ms=since_ms,
         until_ms=until_ms,
@@ -165,12 +167,15 @@ def _fetch_long_short_ratio_history(
 
 def _fetch_paginated(*, fetch_page, since_ms: int, until_ms: int, timeframe: str, exchange) -> list[dict]:
     timeframe_ms = TIMEFRAME_MS[timeframe]
-    cursor = until_ms
+    page_span_ms = (MAX_PAGE_LIMIT - 1) * timeframe_ms
+    cursor = since_ms
     rows_by_timestamp: dict[int, dict] = {}
-    while cursor >= since_ms:
-        batch = fetch_page(cursor)
+    while cursor <= until_ms:
+        page_until = min(cursor + page_span_ms, until_ms)
+        batch = fetch_page(cursor, page_until)
         if not batch:
-            break
+            cursor = page_until + timeframe_ms
+            continue
         timestamps = [int(item["timestamp"]) for item in batch if item.get("timestamp") is not None]
         for item in batch:
             timestamp = item.get("timestamp")
@@ -180,18 +185,33 @@ def _fetch_paginated(*, fetch_page, since_ms: int, until_ms: int, timeframe: str
             if since_ms <= timestamp_ms <= until_ms:
                 rows_by_timestamp[timestamp_ms] = item
         if not timestamps:
+            cursor = page_until + timeframe_ms
+            continue
+        next_cursor = max(timestamps) + timeframe_ms
+        if next_cursor <= cursor:
             break
-        next_cursor = min(timestamps) - timeframe_ms
-        if next_cursor >= cursor:
-            break
-        cursor = next_cursor
-        if min(timestamps) <= since_ms:
-            break
-        if len(batch) < MAX_PAGE_LIMIT:
-            break
+        cursor = max(next_cursor, page_until + timeframe_ms)
         if getattr(exchange, "rateLimit", 0):
             sleep(float(exchange.rateLimit) / 1000.0)
     return [rows_by_timestamp[timestamp] for timestamp in sorted(rows_by_timestamp)]
+
+
+def _ensure_supported_sentiment_window(exchange_id: str, since_ms: int, until_ms: int, timeframe: str) -> None:
+    if until_ms < since_ms:
+        raise ValidationError("Sentiment window is invalid: until must be greater than or equal to since")
+    if exchange_id != "binance":
+        return
+    if until_ms - since_ms <= BINANCE_SENTIMENT_RETENTION_MS:
+        return
+    timeframe_minutes = TIMEFRAME_MS[timeframe] // 60_000
+    max_rows = BINANCE_SENTIMENT_RETENTION_MS // TIMEFRAME_MS[timeframe]
+    raise ValidationError(
+        "Binance public derivatives sentiment endpoints only expose roughly the latest 30 days "
+        f"for Open Interest, Long/Short Ratio, and Taker Buy/Sell Ratio. "
+        f"The requested sentiment window is {(until_ms - since_ms) / 86_400_000:.1f} days on {timeframe}. "
+        f"Use a shorter window, about {max_rows} candles on {timeframe_minutes}m, "
+        "or configure a historical sentiment provider for multi-month training."
+    )
 
 
 def _merge_sentiment(open_interest: list[dict], long_short: list[dict], taker_ratio: list[dict]) -> list[SentimentPoint]:

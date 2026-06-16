@@ -3,11 +3,14 @@ from __future__ import annotations
 import os
 
 os.environ["SMART_TRADE_DATA_MODE"] = "synthetic"
+os.environ["SMART_TRADE_DATABASE_URL"] = "sqlite:///./var/test_smart_trade.db"
+os.environ["SMART_TRADE_ARTIFACT_DIR"] = "./var/test-models"
 
 from fastapi.testclient import TestClient
 
 from app.adapters.api.schemas import TrainingRequest
 from app.main import app
+from app.workers.training_worker import run_once
 
 
 def test_training_and_validation_flow() -> None:
@@ -27,11 +30,24 @@ def test_training_and_validation_flow() -> None:
             f"/api/strategies/{strategy_id}/training-runs",
             json={"timeframe": "M5", "training_rows": 220, "target_n": 8},
         )
-        assert run_response.status_code == 200
+        assert run_response.status_code == 202
         run_payload = run_response.json()
+        assert run_payload["status"] == "PENDING"
+        assert run_payload["model_id"] is None
+        assert run_payload["progress_phase"] == "pending"
+        assert run_payload["requested_parameters"]["timeframe"] == "M5"
+
+        for _ in range(10):
+            run_once("test-worker")
+            completed_run = client.get(f"/api/training-runs/{run_payload['id']}")
+            assert completed_run.status_code == 200
+            run_payload = completed_run.json()
+            if run_payload["status"] not in {"PENDING", "RUNNING"}:
+                break
         assert run_payload["status"] == "TRAINED"
         assert run_payload["model_id"]
-        assert run_payload["requested_parameters"]["timeframe"] == "M5"
+        assert run_payload["progress_phase"] == "trained"
+        assert run_payload["progress_pct"] == 1.0
 
         model_id = run_payload["model_id"]
         model_response = client.get(f"/api/models/{model_id}")

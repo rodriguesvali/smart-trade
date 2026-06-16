@@ -30,6 +30,20 @@
       }
     },
     {
+      "label": "Backend: worker",
+      "type": "shell",
+      "command": ".venv/bin/python -m app.workers.training_worker",
+      "options": {
+        "cwd": "${workspaceFolder}/backend",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/backend",
+          "SMART_TRADE_ENVIRONMENT": "development"
+        }
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
       "label": "Backend: test",
       "type": "shell",
       "command": "/usr/local/bin/python -m pytest -q tests",

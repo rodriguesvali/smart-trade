@@ -31,6 +31,27 @@
       "cwd": "${workspaceFolder}/backend"
     },
     {
+      "name": "Backend: Training Worker",
+      "type": "debugpy",
+      "request": "launch",
+      "python": "${workspaceFolder}/backend/.venv/bin/python",
+      "module": "app.workers.training_worker",
+      "cwd": "${workspaceFolder}/backend",
+      "envFile": "${workspaceFolder}/backend/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend",
+        "SMART_TRADE_ENVIRONMENT": "development"
+      },
+      "justMyCode": true
+    },
+    {
+      "name": "Backend: Training Worker (terminal)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": ".venv/bin/python -m app.workers.training_worker",
+      "cwd": "${workspaceFolder}/backend"
+    },
+    {
       "name": "Backend: Tests",
       "type": "debugpy",
       "request": "launch",
@@ -56,6 +77,14 @@
       "name": "Backend: API + Swagger",
       "configurations": [
         "Backend: FastAPI"
+      ],
+      "stopAll": true
+    },
+    {
+      "name": "Backend: API + Worker",
+      "configurations": [
+        "Backend: FastAPI",
+        "Backend: Training Worker"
       ],
       "stopAll": true
     }

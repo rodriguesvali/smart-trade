@@ -29,6 +29,8 @@ class Settings:
     default_validation_ratio: float
     default_holdout_ratio: float
     default_probability_threshold: float
+    worker_id: str
+    worker_poll_interval_seconds: float
 
 
 def get_settings() -> Settings:
@@ -52,6 +54,8 @@ def get_settings() -> Settings:
         default_validation_ratio=float(os.getenv("SMART_TRADE_VALIDATION_RATIO", "0.2")),
         default_holdout_ratio=float(os.getenv("SMART_TRADE_HOLDOUT_RATIO", "0.2")),
         default_probability_threshold=float(os.getenv("SMART_TRADE_PROBABILITY_THRESHOLD", "0.55")),
+        worker_id=os.getenv("SMART_TRADE_WORKER_ID", "local-training-worker"),
+        worker_poll_interval_seconds=float(os.getenv("SMART_TRADE_WORKER_POLL_INTERVAL_SECONDS", "5")),
     )
 
 

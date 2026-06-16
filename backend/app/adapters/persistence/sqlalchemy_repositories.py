@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
@@ -55,6 +57,22 @@ class SqlAlchemyTrainingRunRepository:
         record = self.session.get(TrainingRunRecord, run_id)
         return _run_from_record(record) if record else None
 
+    def claim_next_pending(self, worker_id: str, timestamp: datetime) -> TrainingRun | None:
+        record = self.session.execute(
+            select(TrainingRunRecord)
+            .where(TrainingRunRecord.status == TrainingRunStatus.PENDING.value)
+            .order_by(TrainingRunRecord.created_at)
+            .limit(1)
+        ).scalar_one_or_none()
+        if record is None:
+            return None
+
+        run = _run_from_record(record)
+        run.mark_running(timestamp, worker_id)
+        self._apply_run(record, run)
+        self.session.commit()
+        return run
+
     def save(self, run: TrainingRun) -> None:
         record = self.session.get(TrainingRunRecord, run.id)
         payload = {
@@ -67,13 +85,41 @@ class SqlAlchemyTrainingRunRepository:
             "started_at": run.started_at,
             "finished_at": run.finished_at,
             "failure_reason": run.failure_reason,
+            "auto_validate": run.auto_validate,
+            "progress_phase": run.progress_phase,
+            "progress_pct": run.progress_pct,
+            "progress_message": run.progress_message,
+            "worker_id": run.worker_id,
+            "locked_at": run.locked_at,
+            "heartbeat_at": run.heartbeat_at,
         }
         if record is None:
             self.session.add(TrainingRunRecord(**payload))
         else:
-            for key, value in payload.items():
-                setattr(record, key, value)
+            self._apply_run(record, run)
         self.session.commit()
+
+    @staticmethod
+    def _apply_run(record: TrainingRunRecord, run: TrainingRun) -> None:
+        payload = {
+            "strategy_id": run.strategy_id,
+            "strategy_version": run.strategy_version,
+            "status": run.status.value,
+            "requested_parameters": run.requested_parameters,
+            "window_configuration": run.window_configuration,
+            "started_at": run.started_at,
+            "finished_at": run.finished_at,
+            "failure_reason": run.failure_reason,
+            "auto_validate": run.auto_validate,
+            "progress_phase": run.progress_phase,
+            "progress_pct": run.progress_pct,
+            "progress_message": run.progress_message,
+            "worker_id": run.worker_id,
+            "locked_at": run.locked_at,
+            "heartbeat_at": run.heartbeat_at,
+        }
+        for key, value in payload.items():
+            setattr(record, key, value)
 
 
 class SqlAlchemyTrainedModelRepository:
@@ -202,6 +248,13 @@ def _run_from_record(record: TrainingRunRecord) -> TrainingRun:
         failure_reason=record.failure_reason,
         created_at=record.created_at,
         model_id=record.model.id if record.model else None,
+        auto_validate=record.auto_validate,
+        progress_phase=record.progress_phase,
+        progress_pct=record.progress_pct,
+        progress_message=record.progress_message,
+        worker_id=record.worker_id,
+        locked_at=record.locked_at,
+        heartbeat_at=record.heartbeat_at,
     )
 
 

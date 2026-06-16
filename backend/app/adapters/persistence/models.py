@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, JSON, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infrastructure.database import Base
@@ -42,6 +42,13 @@ class TrainingRunRecord(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    auto_validate: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    progress_phase: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    progress_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    progress_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    worker_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     strategy: Mapped[TrainingStrategyRecord] = relationship(back_populates="runs")
     model: Mapped["TrainedModelRecord | None"] = relationship(back_populates="run")

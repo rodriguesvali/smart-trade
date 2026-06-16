@@ -95,14 +95,23 @@ class TrainingUseCases:
             requested_parameters=parameters,
             window_configuration={"split": "chronological", "partitions": ["train", "validation_internal", "holdout"]},
             created_at=self.clock.now(),
+            auto_validate=command.auto_validate,
+            progress_phase="pending",
+            progress_pct=0.0,
+            progress_message="Training run is waiting for a worker",
         )
         self.runs.save(run)
         self._audit("TRAINING_REQUESTED", "Training run requested", {"run_id": run.id, "strategy_id": strategy.id})
+        return run
 
+    def execute_next_training(self, worker_id: str) -> TrainingRun | None:
+        run = self.runs.claim_next_pending(worker_id, self.clock.now())
+        if run is None:
+            return None
         try:
-            self._execute_training(run.id)
+            self._execute_training(run.id, worker_id)
             trained_run = self.get_run(run.id)
-            if command.auto_validate and trained_run.model_id is not None:
+            if trained_run.auto_validate and trained_run.model_id is not None:
                 self.validate_model(trained_run.model_id)
             return self.get_run(run.id)
         except Exception as exc:
@@ -112,14 +121,20 @@ class TrainingUseCases:
             self._audit("TRAINING_FAILED", "Training run failed", {"run_id": run.id, "error": str(exc)})
             raise
 
-    def _execute_training(self, run_id: str) -> None:
+    def _execute_training(self, run_id: str, worker_id: str | None = None) -> None:
         run = self.get_run(run_id)
-        run.mark_running(self.clock.now())
+        if run.status == TrainingRunStatus.PENDING:
+            run.mark_running(self.clock.now(), worker_id)
+        if run.status != TrainingRunStatus.RUNNING:
+            raise ValidationError("Training run is not available for execution")
+        run.update_progress(self.clock.now(), "training_model", 0.20, "Building dataset and training model")
         self.runs.save(run)
         self._audit("TRAINING_STARTED", "Training run started", {"run_id": run.id})
 
         model_id = self.ids.new_id()
         output = self.trainer.train(model_id=model_id, parameters=run.requested_parameters)
+        run.update_progress(self.clock.now(), "saving_model", 0.85, "Persisting trained model metadata")
+        self.runs.save(run)
         model = TrainedModel(
             id=model_id,
             run_id=run.id,

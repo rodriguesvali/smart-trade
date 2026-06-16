@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Protocol
 
 from app.domain.entities import ApprovalRecord, AuditEvent, TrainedModel, TrainingRun, TrainingStrategy, ValidationResult
@@ -18,6 +19,9 @@ class StrategyRepository(Protocol):
 
 class TrainingRunRepository(Protocol):
     def get(self, run_id: str) -> TrainingRun | None:
+        raise NotImplementedError
+
+    def claim_next_pending(self, worker_id: str, timestamp: datetime) -> TrainingRun | None:
         raise NotImplementedError
 
     def save(self, run: TrainingRun) -> None:
@@ -54,4 +58,3 @@ class AuditEventRepository(Protocol):
 
     def save(self, event: AuditEvent) -> None:
         raise NotImplementedError
-
