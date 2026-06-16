@@ -10,8 +10,6 @@ from app.domain.exceptions import ValidationError
 
 
 TIMEFRAME_ALIASES = {
-    "M1": "1m",
-    "M3": "3m",
     "M5": "5m",
     "M15": "15m",
     "M30": "30m",
@@ -21,8 +19,6 @@ TIMEFRAME_ALIASES = {
 }
 
 TIMEFRAME_MS = {
-    "1m": 60_000,
-    "3m": 180_000,
     "5m": 300_000,
     "15m": 900_000,
     "30m": 1_800_000,
@@ -93,5 +89,7 @@ def to_ccxt_timeframe(timeframe: str) -> str:
     upper = value.upper()
     normalized = TIMEFRAME_ALIASES.get(upper, value)
     if normalized not in TIMEFRAME_MS:
-        raise ValidationError(f"Unsupported timeframe for CCXT training data: {timeframe}")
+        raise ValidationError(
+            f"Unsupported timeframe for CCXT training data: {timeframe}. Use M5, M15, M30, H1, H4, or D1."
+        )
     return normalized

@@ -31,7 +31,7 @@ O backend ainda nao possui:
 - Coleta real de candles via CCXT.
 - Persistencia de candles e/ou datasets de treinamento reais.
 - Feature engineering real baseada em dados de mercado.
-- Open Interest, Long/Short Ratio e Funding Rate vindos de fonte real.
+- Open Interest, Long/Short Ratio e Taker Buy/Sell Ratio vindos de fonte real.
 - Metadados rastreaveis de origem, periodo e qualidade dos dados.
 - Alembic materializado para evolucao de schema.
 
@@ -39,7 +39,7 @@ O backend ainda nao possui:
 
 - **Fonte primaria de dados:** CCXT, usando metodos publicos da exchange configurada.
 - **Exchange padrao local:** configuravel por `.env`, sem hardcode arquitetural.
-- **Timeframe:** parametro de treinamento, com default `M1`.
+- **Timeframe:** parametro de treinamento, com default `M5`, restrito aos timeframes suportados que sejam multiplos de 5 minutos.
 - **Indicadores tecnicos:** `pandas` + calculos proprios testados para manter controle sobre janelas retrospectivas e evitar vazamento temporal.
 - **Bibliotecas evitadas inicialmente:** `TA-Lib`, por friccao de instalacao nativa; `pandas-ta`, salvo se o calculo proprio se tornar custoso.
 - **Sentimento:** preferencialmente via CCXT quando a exchange configurada expuser dados publicos compativeis. Caso alguma feature obrigatoria nao esteja disponivel, a construcao do dataset deve falhar de forma explicita e auditavel.
@@ -140,7 +140,7 @@ Criar builder real de dataset:
 - calcular `rsi_14` com janela retrospectiva;
 - transformar `open_interest` em `open_interest_roc`;
 - manter `long_short_ratio` como razao normalizada;
-- consumir `funding_rate` do mercado perpétuo correspondente e alinhar retrospectivamente aos candles;
+- consumir `taker_buy_sell_ratio` do mercado perpétuo correspondente e alinhar retrospectivamente aos candles;
 - aplicar lag de seguranca em features de sentimento quando configurado;
 - rejeitar dataset com buracos ou features obrigatorias ausentes;
 - produzir `feature_schema` com regras, janelas, lag e fonte de cada feature.
@@ -161,7 +161,7 @@ Implementar a porta `SentimentDataProvider` em duas etapas:
 
 Politica:
 
-- se `SMART_TRADE_SENTIMENT_REQUIRED=true`, treinamento falha sem Open Interest, Long/Short Ratio ou Funding Rate;
+- se `SMART_TRADE_SENTIMENT_REQUIRED=true`, treinamento falha sem Open Interest, Long/Short Ratio ou Taker Buy/Sell Ratio;
 - se `false`, features indisponiveis podem ser omitidas somente se a estrategia declarar isso explicitamente;
 - para esta estrategia MVP, as tres features de sentimento seguem como obrigatorias ate nova decisao de produto.
 
@@ -253,8 +253,8 @@ O backend sera considerado funcional para treinamento real quando:
 
 ## Riscos
 
-- **Disponibilidade desigual de sentimento via CCXT:** algumas exchanges podem nao expor Open Interest, Long/Short Ratio ou Funding Rate pela API publica.
-- **Granularidade de Funding Rate:** geralmente e mais esparsa que candles M1 e deve ser alinhada retrospectivamente sem look-ahead.
+- **Disponibilidade desigual de sentimento via CCXT:** algumas exchanges podem nao expor Open Interest, Long/Short Ratio ou Taker Buy/Sell Ratio pela API publica.
+- **Compatibilidade exchange-specific:** Taker Buy/Sell Ratio pode exigir metodo implicito da CCXT por exchange, com Binance USDT futures suportada primeiro.
 - **Rate limits:** coleta historica pode exigir paginacao com backoff.
 - **Buracos de candles:** datasets incompletos precisam falhar ou ser reparados com regra explicita.
 - **Look-ahead bias:** qualquer feature com lag ou janela deve ser testada contra vazamento temporal.

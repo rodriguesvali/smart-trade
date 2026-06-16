@@ -17,7 +17,7 @@ def test_real_dataset_builder_uses_requested_training_rows() -> None:
         candles=candles,
         exchange_id="fake",
         symbol="BTC/USDT",
-        timeframe="M1",
+        timeframe="M5",
         training_rows=180,
         target_n=8,
         take_profit_pct=0.001,
@@ -31,7 +31,12 @@ def test_real_dataset_builder_uses_requested_training_rows() -> None:
     assert dataset.labels.shape == (180,)
     assert dataset.feature_metadata["dataset"]["mode"] == "real"
     assert dataset.feature_metadata["dataset"]["sentiment_status"] == "ohlcv_proxy_features"
-    assert dataset.feature_metadata["feature_names"] == ["rsi_14", "open_interest_roc", "long_short_ratio", "funding_rate"]
+    assert dataset.feature_metadata["feature_names"] == [
+        "rsi_14",
+        "open_interest_roc",
+        "long_short_ratio",
+        "taker_buy_sell_ratio",
+    ]
     assert dataset.feature_metadata["dataset"]["requested_training_rows"] == 180
 
 
@@ -41,7 +46,7 @@ def test_real_dataset_builder_fails_when_sentiment_is_required() -> None:
             candles=_candles(220),
             exchange_id="fake",
             symbol="BTC/USDT",
-            timeframe="M1",
+            timeframe="M5",
             training_rows=180,
             target_n=8,
             take_profit_pct=0.001,
@@ -60,7 +65,7 @@ def test_real_dataset_builder_uses_real_sentiment_when_available() -> None:
                 timestamp=candle.timestamp,
                 open_interest=1000 + idx,
                 long_short_ratio=1.2 + (idx % 3) * 0.01,
-                funding_rate=0.00001 * (idx % 5),
+                taker_buy_sell_ratio=1.1 + 0.01 * (idx % 5),
             )
             for idx, candle in enumerate(candles)
         ],
@@ -71,7 +76,7 @@ def test_real_dataset_builder_uses_real_sentiment_when_available() -> None:
         candles=candles,
         exchange_id="fake",
         symbol="BTC/USDT",
-        timeframe="M1",
+        timeframe="M5",
         training_rows=180,
         target_n=8,
         take_profit_pct=0.001,
@@ -83,7 +88,7 @@ def test_real_dataset_builder_uses_real_sentiment_when_available() -> None:
     )
 
     assert dataset.feature_metadata["dataset"]["sentiment_status"] == "ccxt_derivatives_sentiment"
-    assert dataset.feature_metadata["stationarity_rules"]["funding_rate"] == "ccxt_derivatives_native_rate"
+    assert dataset.feature_metadata["stationarity_rules"]["taker_buy_sell_ratio"] == "ccxt_derivatives_native_ratio"
 
 
 def _candles(count: int) -> list[MarketCandle]:

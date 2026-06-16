@@ -7,18 +7,18 @@ Build backend em andamento para o MVP resetado do pipeline de treinamento. A fat
 ## Escopo Implementado
 
 - Backend FastAPI com Swagger/OpenAPI em `/docs`.
-- Catálogo de estratégias com uma estratégia registrada: `RSI Sentiment XGBoost M1`.
+- Catálogo de estratégias com uma estratégia registrada: `RSI Sentiment XGBoost`.
 - Endpoint para listar estratégias.
 - Endpoint para abrir detalhes da estratégia.
 - Endpoint para iniciar treinamento.
-- `timeframe` tratado como parâmetro de treinamento, com default `M1`, e não como metadado fixo da estratégia.
+- `timeframe` tratado como parâmetro de treinamento, com default `M5`, e não como metadado fixo da estratégia.
 - `exchange_id`, `data_mode` e `sentiment_required` tratados como parâmetros/configuração de treinamento.
 - Adapter público CCXT para coleta de candles OHLCV reais da exchange configurada.
 - Feature engineering real com pandas/NumPy para RSI/IFR e operadores de sentimento vindos da CCXT quando `sentiment_required=true`.
-- Provider CCXT de sentimento para Open Interest, Long/Short Ratio e Funding Rate do mercado perpétuo correspondente.
+- Provider CCXT de sentimento para Open Interest, Long/Short Ratio e Taker Buy/Sell Ratio do mercado perpétuo correspondente.
 - Geração de um novo modelo treinado por execução.
 - Persistência de execução, modelo, métricas, resultados de validação e eventos de auditoria via SQLAlchemy.
-- Treinamento XGBoost determinístico sobre dataset sintético de desenvolvimento, com features RSI/IFR, Open Interest RoC, Long/Short Ratio e Funding Rate.
+- Treinamento XGBoost determinístico sobre dataset sintético de desenvolvimento, com features RSI/IFR, Open Interest RoC, Long/Short Ratio e Taker Buy/Sell Ratio.
 - Treinamento XGBoost com dataset real salvo junto ao artefato do modelo em `.dataset.npz`, permitindo validação reprodutível do mesmo modelo.
 - Artefato XGBoost salvo em formato nativo `.json`.
 - Resposta de modelo expõe `dataset_metadata` com modo, exchange, símbolo, timeframe, fonte, período e janelas cronológicas.
@@ -84,14 +84,14 @@ Checagem executada:
 - A validação automática prevista no SAD pode ser acionada pelo campo `auto_validate` do endpoint de treinamento. Para o fluxo Swagger solicitado, o default é `false`, permitindo treinar primeiro e depois executar validação manualmente via `POST /api/models/{model_id}/validate`.
 - Alembic ainda não foi materializado nesta fatia; a persistência usa `create_all` no startup para permitir validação rápida do fluxo backend. A próxima fatia de build deve substituir isso por migrações Alembic versionadas.
 - O modo de produto default é `SMART_TRADE_DATA_MODE=real`, usando `ccxt.fetch_ohlcv` para candles fechados. Para testes automatizados, `SMART_TRADE_DATA_MODE=synthetic` evita dependência de rede.
-- `sentiment_required=true` exige Open Interest, Long/Short Ratio e Funding Rate via CCXT. `sentiment_required=false` permite fallback para proxies OHLCV claramente marcados em `feature_schema.dataset.sentiment_status=ohlcv_proxy_features`.
+- `sentiment_required=true` exige Open Interest, Long/Short Ratio e Taker Buy/Sell Ratio via CCXT. `sentiment_required=false` permite fallback para proxies OHLCV claramente marcados em `feature_schema.dataset.sentiment_status=ohlcv_proxy_features`.
 
 ## Evidência de Verificação
 
 - `backend/.venv/bin/python -m pytest -q backend/tests`: 3 passed.
 - Smoke interno do builder real: dataset real em memória produziu `(252, 4)` features com metadados `mode=real`.
-- Smoke CCXT público: `binance BTC/USDT M1` retornou 5 candles fechados.
-- Smoke HTTP em modo real com `binance BTC/USDT M1`:
+- Smoke CCXT público: `binance BTC/USDT M5` retornou candles fechados.
+- Smoke HTTP em modo real com `binance BTC/USDT M5`:
   - `POST /api/strategies/{strategy_id}/training-runs` retornou execução `TRAINED`.
   - `GET /api/models/{model_id}` retornou `dataset_metadata.mode=real`, `sentiment_status=ccxt_derivatives_sentiment`, `requested_training_rows=180` e `usable_rows=180`.
   - `POST /api/models/{model_id}/validate` retornou modelo `VALIDATED`.
@@ -126,7 +126,7 @@ Payload mínimo real recomendado no Swagger:
   "exchange_id": "binance",
   "symbol": "BTC/USDT",
   "sentiment_symbol": "BTC/USDT:USDT",
-  "timeframe": "M1",
+  "timeframe": "M5",
   "training_rows": 180,
   "target_n": 5,
   "take_profit_pct": 0.0002,

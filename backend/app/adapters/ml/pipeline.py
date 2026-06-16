@@ -14,7 +14,7 @@ from app.application.ports.sentiment import SentimentSeries
 from app.domain.exceptions import ValidationError
 
 
-FEATURE_NAMES = ["rsi_14", "open_interest_roc", "long_short_ratio", "funding_rate"]
+FEATURE_NAMES = ["rsi_14", "open_interest_roc", "long_short_ratio", "taker_buy_sell_ratio"]
 
 
 @dataclass(frozen=True)
@@ -57,7 +57,7 @@ def generate_dataset(
     open_interest_roc[0] = 0
 
     long_short_ratio = 1.0 + 0.18 * np.sin(np.linspace(0, 15, price.size)) + rng.normal(0, 0.035, price.size)
-    funding_rate = rng.normal(0.00001, 0.00005, price.size)
+    taker_buy_sell_ratio = 1.0 + 0.12 * np.sin(np.linspace(0, 25, price.size)) + rng.normal(0, 0.03, price.size)
 
     start = 40
     usable = rows
@@ -67,7 +67,7 @@ def generate_dataset(
             rsi[start:end],
             open_interest_roc[start:end],
             long_short_ratio[start:end],
-            funding_rate[start:end],
+            taker_buy_sell_ratio[start:end],
         ]
     )
 
@@ -95,7 +95,7 @@ def generate_dataset(
         "feature_names": FEATURE_NAMES,
         "stationarity_rules": {
             "open_interest_roc": "rate_of_change_retrospective",
-            "funding_rate": "native_rate",
+            "taker_buy_sell_ratio": "native_ratio",
             "long_short_ratio": "native_ratio",
             "rsi_14": "bounded_indicator",
         },
@@ -125,7 +125,7 @@ def build_dataset_from_candles(
 ) -> DatasetBundle:
     if sentiment_required and sentiment is None:
         raise ValidationError(
-            "Real sentiment data is required, but no CCXT sentiment provider returned Open Interest, Long/Short Ratio, and Funding Rate"
+            "Real sentiment data is required, but no CCXT sentiment provider returned Open Interest, Long/Short Ratio, and Taker Buy/Sell Ratio"
         )
     minimum_rows = training_rows + target_n
     if len(candles) < minimum_rows:
@@ -161,7 +161,7 @@ def build_dataset_from_candles(
         returns = frame["close"].pct_change().replace([np.inf, -np.inf], 0.0).fillna(0.0)
         rolling_scale = returns.rolling(window=30, min_periods=5).std().replace(0.0, np.nan).fillna(returns.std() or 1e-9)
         frame["long_short_ratio"] = (1.0 + (returns / rolling_scale).clip(-0.25, 0.25)).fillna(1.0)
-        frame["funding_rate"] = 0.0
+        frame["taker_buy_sell_ratio"] = 1.0
     else:
         frame = _merge_sentiment_frame(frame, sentiment)
 
@@ -205,7 +205,7 @@ def build_dataset_from_candles(
         },
         "stationarity_rules": {
             "open_interest_roc": "ccxt_derivatives_rate_of_change" if sentiment else "ohlcv_volume_rate_of_change_proxy",
-            "funding_rate": "ccxt_derivatives_native_rate" if sentiment else "zero_proxy_no_funding_feed",
+            "taker_buy_sell_ratio": "ccxt_derivatives_native_ratio" if sentiment else "neutral_proxy_no_taker_ratio_feed",
             "long_short_ratio": "ccxt_derivatives_native_ratio" if sentiment else "ohlcv_return_pressure_proxy",
             "rsi_14": "bounded_indicator",
         },
@@ -394,7 +394,7 @@ def _merge_sentiment_frame(frame: pd.DataFrame, sentiment: SentimentSeries) -> p
                 "timestamp": point.timestamp,
                 "open_interest": point.open_interest,
                 "long_short_ratio": point.long_short_ratio,
-                "funding_rate": point.funding_rate,
+                "taker_buy_sell_ratio": point.taker_buy_sell_ratio,
             }
             for point in sentiment.points
         ]
@@ -407,7 +407,7 @@ def _merge_sentiment_frame(frame: pd.DataFrame, sentiment: SentimentSeries) -> p
         on="timestamp",
         direction="backward",
     )
-    required = ["open_interest", "long_short_ratio", "funding_rate"]
+    required = ["open_interest", "long_short_ratio", "taker_buy_sell_ratio"]
     if merged[required].isna().any().any():
         missing = {column: int(merged[column].isna().sum()) for column in required}
         raise ValidationError(f"Sentiment data does not cover all candle timestamps: {missing}")

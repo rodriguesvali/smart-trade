@@ -10,7 +10,7 @@ class SentimentPoint:
     timestamp: datetime
     open_interest: float
     long_short_ratio: float
-    funding_rate: float
+    taker_buy_sell_ratio: float
 
 
 @dataclass(frozen=True)

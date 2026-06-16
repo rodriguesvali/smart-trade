@@ -13,17 +13,17 @@ def strategy_payload() -> dict:
     settings = get_settings()
     return {
         "id": STRATEGY_ID,
-        "name": "RSI Sentiment XGBoost M1",
+        "name": "RSI Sentiment XGBoost",
         "version": "1.0.0",
         "description": (
             "Binary XGBoost training strategy combining RSI/IFR with Open Interest, "
-            "Long/Short Ratio, and Funding Rate sentiment features."
+            "Long/Short Ratio, and Taker Buy/Sell Ratio sentiment features."
         ),
         "model_family": "XGBoost",
         "status": "AVAILABLE",
         "feature_contract": {
             "technical": ["rsi_14"],
-            "sentiment": ["open_interest_roc", "long_short_ratio", "funding_rate"],
+            "sentiment": ["open_interest_roc", "long_short_ratio", "taker_buy_sell_ratio"],
             "leakage_controls": [
                 "chronological_split",
                 "rolling_or_train_fitted_statistics_only",

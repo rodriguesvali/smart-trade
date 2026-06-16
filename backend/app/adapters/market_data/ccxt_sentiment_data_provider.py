@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from math import ceil
 from time import sleep
 
 import ccxt
@@ -9,6 +8,9 @@ import ccxt
 from app.adapters.market_data.ccxt_market_data_provider import TIMEFRAME_MS, to_ccxt_timeframe
 from app.application.ports.sentiment import SentimentPoint, SentimentSeries
 from app.domain.exceptions import ValidationError
+
+
+MAX_PAGE_LIMIT = 500
 
 
 class CcxtSentimentDataProvider:
@@ -26,39 +28,37 @@ class CcxtSentimentDataProvider:
         ccxt_timeframe = _sentiment_timeframe(timeframe)
         since_ms = _to_ms(since)
         until_ms = _to_ms(until)
-        limit = _limit_for_range(since_ms, until_ms, ccxt_timeframe)
 
         if not exchange.has.get("fetchOpenInterestHistory"):
             raise ValidationError(f"Exchange {exchange_id} does not support open interest history through CCXT")
         if not exchange.has.get("fetchLongShortRatioHistory"):
             raise ValidationError(f"Exchange {exchange_id} does not support long/short ratio history through CCXT")
-        if not exchange.has.get("fetchFundingRateHistory"):
-            raise ValidationError(f"Exchange {exchange_id} does not support funding rate history through CCXT")
-
-        open_interest = exchange.fetch_open_interest_history(
-            market_symbol,
-            ccxt_timeframe,
-            since_ms,
-            limit,
-            {"until": until_ms},
+        open_interest = _fetch_open_interest_history(
+            exchange=exchange,
+            symbol=market_symbol,
+            timeframe=ccxt_timeframe,
+            since_ms=since_ms,
+            until_ms=until_ms,
         )
         self._sleep(exchange)
-        long_short = exchange.fetch_long_short_ratio_history(
-            market_symbol,
-            ccxt_timeframe,
-            since_ms,
-            limit,
-            {"until": until_ms},
+        long_short = _fetch_long_short_ratio_history(
+            exchange=exchange,
+            symbol=market_symbol,
+            timeframe=ccxt_timeframe,
+            since_ms=since_ms,
+            until_ms=until_ms,
         )
         self._sleep(exchange)
-        funding = exchange.fetch_funding_rate_history(
-            market_symbol,
-            since_ms,
-            max(1, ceil((until_ms - since_ms) / (8 * 60 * 60 * 1000)) + 3),
-            {"until": until_ms},
+        taker_ratio = _fetch_taker_buy_sell_ratio(
+            exchange=exchange,
+            exchange_id=exchange_id,
+            symbol=market_symbol,
+            timeframe=ccxt_timeframe,
+            since_ms=since_ms,
+            until_ms=until_ms,
         )
 
-        points = _merge_sentiment(open_interest, long_short, funding)
+        points = _merge_sentiment(open_interest, long_short, taker_ratio)
         if not points:
             raise ValidationError(f"CCXT returned no sentiment rows for {exchange_id} {market_symbol}")
         return SentimentSeries(
@@ -69,7 +69,7 @@ class CcxtSentimentDataProvider:
                 "timeframe": ccxt_timeframe,
                 "open_interest_rows": len(open_interest),
                 "long_short_ratio_rows": len(long_short),
-                "funding_rate_rows": len(funding),
+                "taker_buy_sell_ratio_rows": len(taker_ratio),
                 "start_timestamp": points[0].timestamp.isoformat(),
                 "end_timestamp": points[-1].timestamp.isoformat(),
             },
@@ -86,7 +86,115 @@ class CcxtSentimentDataProvider:
             sleep(float(exchange.rateLimit) / 1000.0)
 
 
-def _merge_sentiment(open_interest: list[dict], long_short: list[dict], funding: list[dict]) -> list[SentimentPoint]:
+def _fetch_taker_buy_sell_ratio(
+    *,
+    exchange,
+    exchange_id: str,
+    symbol: str,
+    timeframe: str,
+    since_ms: int,
+    until_ms: int,
+) -> list[dict]:
+    if exchange_id != "binance":
+        raise ValidationError(
+            f"Exchange {exchange_id} taker buy/sell ratio is not implemented yet; Binance USDT futures is supported"
+        )
+    raw_symbol = _contract_symbol_id(symbol)
+    return _fetch_paginated(
+        fetch_page=lambda until_cursor: exchange.fapidata_get_takerlongshortratio(
+            {
+                "symbol": raw_symbol,
+                "period": timeframe,
+                "startTime": since_ms,
+                "endTime": until_cursor,
+                "limit": MAX_PAGE_LIMIT,
+            }
+        ),
+        since_ms=since_ms,
+        until_ms=until_ms,
+        timeframe=timeframe,
+        exchange=exchange,
+    )
+
+
+def _fetch_open_interest_history(
+    *,
+    exchange,
+    symbol: str,
+    timeframe: str,
+    since_ms: int,
+    until_ms: int,
+) -> list[dict]:
+    return _fetch_paginated(
+        fetch_page=lambda until_cursor: exchange.fetch_open_interest_history(
+            symbol,
+            timeframe,
+            since_ms,
+            MAX_PAGE_LIMIT,
+            {"until": until_cursor},
+        ),
+        since_ms=since_ms,
+        until_ms=until_ms,
+        timeframe=timeframe,
+        exchange=exchange,
+    )
+
+
+def _fetch_long_short_ratio_history(
+    *,
+    exchange,
+    symbol: str,
+    timeframe: str,
+    since_ms: int,
+    until_ms: int,
+) -> list[dict]:
+    return _fetch_paginated(
+        fetch_page=lambda until_cursor: exchange.fetch_long_short_ratio_history(
+            symbol,
+            timeframe,
+            since_ms,
+            MAX_PAGE_LIMIT,
+            {"until": until_cursor},
+        ),
+        since_ms=since_ms,
+        until_ms=until_ms,
+        timeframe=timeframe,
+        exchange=exchange,
+    )
+
+
+def _fetch_paginated(*, fetch_page, since_ms: int, until_ms: int, timeframe: str, exchange) -> list[dict]:
+    timeframe_ms = TIMEFRAME_MS[timeframe]
+    cursor = until_ms
+    rows_by_timestamp: dict[int, dict] = {}
+    while cursor >= since_ms:
+        batch = fetch_page(cursor)
+        if not batch:
+            break
+        timestamps = [int(item["timestamp"]) for item in batch if item.get("timestamp") is not None]
+        for item in batch:
+            timestamp = item.get("timestamp")
+            if timestamp is None:
+                continue
+            timestamp_ms = int(timestamp)
+            if since_ms <= timestamp_ms <= until_ms:
+                rows_by_timestamp[timestamp_ms] = item
+        if not timestamps:
+            break
+        next_cursor = min(timestamps) - timeframe_ms
+        if next_cursor >= cursor:
+            break
+        cursor = next_cursor
+        if min(timestamps) <= since_ms:
+            break
+        if len(batch) < MAX_PAGE_LIMIT:
+            break
+        if getattr(exchange, "rateLimit", 0):
+            sleep(float(exchange.rateLimit) / 1000.0)
+    return [rows_by_timestamp[timestamp] for timestamp in sorted(rows_by_timestamp)]
+
+
+def _merge_sentiment(open_interest: list[dict], long_short: list[dict], taker_ratio: list[dict]) -> list[SentimentPoint]:
     oi_values = {
         int(item["timestamp"]): float(item.get("openInterestAmount") or item.get("openInterestValue") or 0.0)
         for item in open_interest
@@ -97,44 +205,37 @@ def _merge_sentiment(open_interest: list[dict], long_short: list[dict], funding:
         for item in long_short
         if item.get("timestamp") is not None and item.get("longShortRatio") is not None
     }
-    funding_values = {
-        int(item["timestamp"]): float(item["fundingRate"])
-        for item in funding
-        if item.get("timestamp") is not None and item.get("fundingRate") is not None
+    taker_values = {
+        int(item["timestamp"]): float(item["buySellRatio"])
+        for item in taker_ratio
+        if item.get("timestamp") is not None and item.get("buySellRatio") is not None
     }
-    timestamps = sorted(set(oi_values) | set(long_short_values) | set(funding_values))
+    timestamps = sorted(set(oi_values) | set(long_short_values) | set(taker_values))
     if not timestamps:
         return []
     points: list[SentimentPoint] = []
     latest_oi: float | None = None
     latest_long_short: float | None = None
-    latest_funding: float | None = None
+    latest_taker_ratio: float | None = None
     for timestamp_ms in timestamps:
         latest_oi = oi_values.get(timestamp_ms, latest_oi)
         latest_long_short = long_short_values.get(timestamp_ms, latest_long_short)
-        latest_funding = funding_values.get(timestamp_ms, latest_funding)
-        if latest_oi is None or latest_long_short is None or latest_funding is None:
+        latest_taker_ratio = taker_values.get(timestamp_ms, latest_taker_ratio)
+        if latest_oi is None or latest_long_short is None or latest_taker_ratio is None:
             continue
         points.append(
             SentimentPoint(
                 timestamp=datetime.fromtimestamp(timestamp_ms / 1000, timezone.utc),
                 open_interest=latest_oi,
                 long_short_ratio=latest_long_short,
-                funding_rate=latest_funding,
+                taker_buy_sell_ratio=latest_taker_ratio,
             )
         )
     return points
 
 
 def _sentiment_timeframe(timeframe: str) -> str:
-    ccxt_timeframe = to_ccxt_timeframe(timeframe)
-    if TIMEFRAME_MS[ccxt_timeframe] < TIMEFRAME_MS["5m"]:
-        return "5m"
-    return ccxt_timeframe
-
-
-def _limit_for_range(since_ms: int, until_ms: int, timeframe: str) -> int:
-    return min(500, max(10, ceil((until_ms - since_ms) / TIMEFRAME_MS[timeframe]) + 5))
+    return to_ccxt_timeframe(timeframe)
 
 
 def _to_ms(value: datetime) -> int:
@@ -150,3 +251,11 @@ def _derivative_symbol(symbol: str) -> str:
         raise ValidationError(f"Cannot derive contract symbol from {symbol}")
     base, quote = symbol.split("/", 1)
     return f"{base}/{quote}:{quote}"
+
+
+def _contract_symbol_id(symbol: str) -> str:
+    base_quote = symbol.split(":", 1)[0]
+    if "/" not in base_quote:
+        return base_quote
+    base, quote = base_quote.split("/", 1)
+    return f"{base}{quote}"

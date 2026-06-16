@@ -14,7 +14,7 @@ from app.application.ports.repositories import (
 )
 from app.domain.entities import ApprovalRecord, AuditEvent, TrainedModel, TrainingRun, ValidationResult
 from app.domain.enums import ApprovalDecision, TrainedModelStatus, TrainingRunStatus
-from app.domain.exceptions import NotFoundError
+from app.domain.exceptions import NotFoundError, ValidationError
 
 
 @dataclass(frozen=True)
@@ -86,6 +86,7 @@ class TrainingUseCases:
         strategy = self.get_strategy(command.strategy_id)
         strategy.ensure_available()
         parameters = strategy.default_parameters | {k: v for k, v in command.overrides.items() if v is not None}
+        _validate_training_parameters(parameters)
         run = TrainingRun(
             id=self.ids.new_id(),
             strategy_id=strategy.id,
@@ -208,3 +209,13 @@ class TrainingUseCases:
             )
         )
 
+
+def _validate_training_parameters(parameters: dict) -> None:
+    for key in ("take_profit_pct", "stop_loss_pct"):
+        value = float(parameters[key])
+        if value <= 0:
+            raise ValidationError(f"{key} must be greater than zero")
+        if value >= 1:
+            raise ValidationError(
+                f"{key} must be a decimal fraction, not a whole percent. Use 0.01 for 1%, 0.001 for 0.1%."
+            )

@@ -33,8 +33,18 @@ class TrainingRequest(BaseModel):
     sentiment_symbol: str | None = None
     timeframe: str | None = None
     target_n: int | None = Field(default=None, ge=2, le=240)
-    take_profit_pct: float | None = Field(default=None, gt=0)
-    stop_loss_pct: float | None = Field(default=None, gt=0)
+    take_profit_pct: float | None = Field(
+        default=None,
+        gt=0,
+        lt=1,
+        description="Decimal fraction target. Example: 0.01 means 1%, 0.001 means 0.1%.",
+    )
+    stop_loss_pct: float | None = Field(
+        default=None,
+        gt=0,
+        lt=1,
+        description="Decimal fraction target. Example: 0.01 means 1%, 0.001 means 0.1%.",
+    )
     training_rows: int | None = Field(default=None, ge=180, le=5000)
 
 
