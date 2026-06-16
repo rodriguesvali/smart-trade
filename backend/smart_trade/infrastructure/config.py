@@ -31,6 +31,7 @@ class Settings:
     default_probability_threshold: float
     worker_id: str
     worker_poll_interval_seconds: float
+    cors_origins: list[str]
 
 
 def get_settings() -> Settings:
@@ -56,6 +57,10 @@ def get_settings() -> Settings:
         default_probability_threshold=float(os.getenv("SMART_TRADE_PROBABILITY_THRESHOLD", "0.55")),
         worker_id=os.getenv("SMART_TRADE_WORKER_ID", "local-training-worker"),
         worker_poll_interval_seconds=float(os.getenv("SMART_TRADE_WORKER_POLL_INTERVAL_SECONDS", "5")),
+        cors_origins=_list_env(
+            "SMART_TRADE_CORS_ORIGINS",
+            ["http://localhost:4200", "http://127.0.0.1:4200"],
+        ),
     )
 
 
@@ -64,3 +69,10 @@ def _bool_env(name: str, default: bool) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _list_env(name: str, default: list[str]) -> list[str]:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return [item.strip() for item in value.split(",") if item.strip()]

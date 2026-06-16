@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from smart_trade.adapters.api.routes import router
 from smart_trade.adapters.persistence.sqlalchemy_repositories import SqlAlchemyStrategyRepository
+from smart_trade.infrastructure.config import get_settings
 from smart_trade.infrastructure.database import init_database
 from smart_trade.strategy_catalog import seed_strategy_catalog
 from smart_trade.infrastructure.database import SessionLocal
@@ -13,6 +15,15 @@ app = FastAPI(
     title="Smart Trade Backend",
     description="MVP backend for XGBoost strategy training, trained model inspection, and validation.",
     version="0.1.0",
+)
+
+settings = get_settings()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

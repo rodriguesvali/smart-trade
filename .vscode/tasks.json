@@ -57,6 +57,36 @@
         }
       },
       "problemMatcher": []
+    },
+    {
+      "label": "Frontend: start",
+      "type": "shell",
+      "command": "npm start -- --host 0.0.0.0",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "typescript",
+        "pattern": {
+          "regexp": "^(.*)$",
+          "message": 1
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Building|Application bundle generation",
+          "endsPattern": "Local:|Watch mode enabled"
+        }
+      }
+    },
+    {
+      "label": "Frontend: build",
+      "type": "shell",
+      "command": "npm run build",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": []
     }
   ]
 }

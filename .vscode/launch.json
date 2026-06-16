@@ -70,13 +70,38 @@
         "GLOBAL_RANDOM_SEED": "42"
       },
       "justMyCode": true
+    },
+    {
+      "name": "Frontend: Angular",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm start -- --host 0.0.0.0",
+      "cwd": "${workspaceFolder}/frontend"
+    },
+    {
+      "name": "Frontend: Browser",
+      "type": "pwa-chrome",
+      "request": "launch",
+      "url": "http://localhost:4200",
+      "webRoot": "${workspaceFolder}/frontend",
+      "preLaunchTask": "Frontend: start",
+      "sourceMaps": true
+    },
+    {
+      "name": "Backend: Swagger Browser",
+      "type": "pwa-chrome",
+      "request": "launch",
+      "url": "http://localhost:8000/docs",
+      "webRoot": "${workspaceFolder}/backend",
+      "sourceMaps": false
     }
   ],
   "compounds": [
     {
       "name": "Backend: API + Swagger",
       "configurations": [
-        "Backend: FastAPI"
+        "Backend: FastAPI",
+        "Backend: Swagger Browser"
       ],
       "stopAll": true
     },
@@ -85,6 +110,24 @@
       "configurations": [
         "Backend: FastAPI",
         "Backend: Training Worker"
+      ],
+      "stopAll": true
+    },
+    {
+      "name": "Full Stack: API + Worker + Frontend",
+      "configurations": [
+        "Backend: FastAPI",
+        "Backend: Training Worker",
+        "Frontend: Angular"
+      ],
+      "stopAll": true
+    },
+    {
+      "name": "Full Stack: API + Worker + Frontend + Browser",
+      "configurations": [
+        "Backend: FastAPI",
+        "Backend: Training Worker",
+        "Frontend: Browser"
       ],
       "stopAll": true
     }
