@@ -63,6 +63,7 @@ def create_training_run(
                     "data_mode": request.data_mode,
                     "sentiment_required": request.sentiment_required,
                     "symbol": request.symbol,
+                    "sentiment_symbol": request.sentiment_symbol,
                     "timeframe": request.timeframe,
                     "target_n": request.target_n,
                     "take_profit_pct": request.take_profit_pct,

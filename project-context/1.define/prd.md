@@ -100,7 +100,7 @@ Os valores de `N`, `X` e `Y` devem ser parametrizáveis externamente.
 - **RSI / IFR:** usado em sua escala padrão de 0 a 100 para identificar sobrevenda e sobrecompra.
 - **Open Interest:** não deve ser usado em valor absoluto. Deve ser transformado em taxa de variação, desvio em relação a uma média móvel ou outro formato estacionário.
 - **Long/Short Ratio:** pode ser mantido em sua razão original por ser uma métrica naturalmente normalizada.
-- **CVD / Cumulative Volume Delta:** não deve ser usado em valor absoluto acumulado. Deve ser usado como variação por candle, delta do CVD ou normalizado por janela móvel.
+- **Funding Rate:** deve ser usado como taxa nativa do mercado perpétuo correspondente, alinhado retrospectivamente aos candles spot e com lag de segurança quando aplicável.
 
 Todas as transformações baseadas em médias, desvios, z-scores, min-max ou janelas móveis devem usar apenas dados retrospectivos. Nenhuma estatística global calculada sobre o dataset completo pode ser usada.
 
@@ -116,7 +116,7 @@ Para o MVP, a estratégia deve expor em seus detalhes:
 - Timeframe default: `M1`, definido em `default_parameters` e alterável por solicitação de treinamento.
 - Mercado alvo: crypto spot, usando dados de sentimento do mercado de derivativos correspondente como proxy quando disponíveis.
 - Indicador técnico: RSI/IFR.
-- Operadores de sentimento: Open Interest, Long/Short Ratio e CVD.
+- Operadores de sentimento: Open Interest, Long/Short Ratio e Funding Rate.
 - Modelo: XGBoost.
 - Hiperparâmetros configuráveis, como `max_depth`, `learning_rate` e `scale_pos_weight`.
 - Parâmetros configuráveis de target, janelas de treino, validação interna e holdout.
@@ -168,7 +168,7 @@ Ao acionar o início do treinamento, o sistema deve:
 - Criar um registro de execução com status `PENDING`.
 - Validar parâmetros obrigatórios.
 - Carregar os dados históricos do ativo configurado.
-- Aplicar transformações para melhorar a estacionariedade das features de volume e sentimento, especialmente CVD e Open Interest.
+- Aplicar transformações para melhorar a estacionariedade das features de volume e sentimento, especialmente Open Interest.
 - Aplicar lag de segurança nas features de sentimento quando houver risco de atraso da fonte de dados.
 - Dividir os dados cronologicamente em três partições: treino, validação interna e holdout fora da amostra.
 - Garantir ausência de vazamento temporal.
@@ -346,7 +346,7 @@ Dado que o usuário acessa `XGBoost Strategies`, quando a tela carregar, então 
 
 ### CA3 - Exibição de Detalhes e Features Estacionárias
 
-Dado que o usuário abre os detalhes da estratégia, o sistema deve detalhar explicitamente as regras de transformação de features, incluindo deltas ou taxa de variação para CVD e Open Interest, regras de lag de segurança para sentimento quando aplicáveis, além da lógica de rotulagem do target.
+Dado que o usuário abre os detalhes da estratégia, o sistema deve detalhar explicitamente as regras de transformação de features, incluindo taxa de variação para Open Interest, Funding Rate do mercado perpétuo correspondente, regras de lag de segurança para sentimento quando aplicáveis, além da lógica de rotulagem do target.
 
 ### CA4 - Execução e Early Stopping
 
@@ -379,7 +379,7 @@ As seguintes premissas técnicas ficam definidas para o escopo deste MVP:
 1. **Ativo padrão:** o pipeline será configurado via `.env` com a paridade `BTC/USDT`, utilizando CCXT como fronteira primária de obtenção de dados da exchange configurada. O preço spot será a referência operacional, e futuros perpétuos poderão ser usados como proxy para métricas de sentimento quando disponíveis pela exchange configurada.
 2. **Automação da validação:** a validação será executada de forma automática após o sucesso do treinamento. Apenas a decisão de aprovação ou rejeição permanece estritamente manual.
 3. **Filtros de aprovação:** para o MVP, não haverá travas automáticas por valor mínimo de métrica, como win rate mínimo. A validação serve para gerar evidências; o julgamento de qualidade do modelo é responsabilidade do operador técnico.
-4. **Origem dos dados de sentimento:** Open Interest, Long/Short Ratio e variações de CVD serão consumidos preferencialmente via CCXT quando a exchange configurada expuser métricas públicas compatíveis. Qualquer provedor externo não-CCXT deverá ser aprovado como adapter separado, evitando calcular CVD bruto a partir de dados de tick, order book ou trades individuais dentro do MVP.
+4. **Origem dos dados de sentimento:** Open Interest, Long/Short Ratio e Funding Rate serão consumidos preferencialmente via CCXT quando a exchange configurada expuser métricas públicas compatíveis. Qualquer provedor externo não-CCXT deverá ser aprovado como adapter separado.
 5. **Formato do modelo:** o artefato treinado será salvo em formato nativo do XGBoost, `.json` ou `.ubj`, e não em `.pkl` ou `.joblib`.
 6. **Target no MVP:** `X` e `Y` serão configuráveis externamente como percentuais estáticos no MVP, com aviso operacional para revisão em mudanças de regime de volatilidade. Barreiras adaptativas por ATR ou desvio padrão ficam como evolução futura.
 
@@ -390,7 +390,8 @@ As seguintes premissas técnicas ficam definidas para o escopo deste MVP:
 - `project-context/1.define/revisao.md`
 - Revisão especializada em XGBoost recebida em 2026-06-15, cobrindo data leakage, lag de sentimento, target, formato de artefato e rastreabilidade do fluxo.
 - Direcionamento do Agentic Architect em 2026-06-15: iniciar o projeto com PRD focado no pipeline de treinamento do MVP.
-- Direcionamento do Agentic Architect em 2026-06-15: preparar suporte a múltiplas estratégias, gerar novo modelo por treinamento, e usar RSI/IFR com Open Interest, Long/Short Ratio e CVD na primeira estratégia.
+- Direcionamento do Agentic Architect em 2026-06-15: preparar suporte a múltiplas estratégias, gerar novo modelo por treinamento, e usar RSI/IFR com operadores de sentimento na primeira estratégia.
+- Direcionamento do Agentic Architect em 2026-06-16: usar Open Interest, Long/Short Ratio e Funding Rate, substituindo CVD para manter os operadores de sentimento obtíveis via CCXT no MVP.
 
 ## 14. Auditoria do Artefato
 

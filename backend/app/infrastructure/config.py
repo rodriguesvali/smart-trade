@@ -38,7 +38,7 @@ def get_settings() -> Settings:
         default_exchange_id=os.getenv("SMART_TRADE_EXCHANGE_ID", "binance"),
         default_symbol=os.getenv("SMART_TRADE_DEFAULT_SYMBOL", "BTC/USDT"),
         default_timeframe=os.getenv("SMART_TRADE_DEFAULT_TIMEFRAME", "M1"),
-        sentiment_required=_bool_env("SMART_TRADE_SENTIMENT_REQUIRED", False),
+        sentiment_required=_bool_env("SMART_TRADE_SENTIMENT_REQUIRED", True),
         default_target_n=int(os.getenv("SMART_TRADE_TARGET_N", "15")),
         default_take_profit_pct=float(os.getenv("SMART_TRADE_TARGET_TAKE_PROFIT_PCT", "0.0015")),
         default_stop_loss_pct=float(os.getenv("SMART_TRADE_TARGET_STOP_LOSS_PCT", "0.0010")),

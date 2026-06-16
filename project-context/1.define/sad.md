@@ -43,7 +43,7 @@ In scope:
 - One implemented strategy: `RSI Sentiment XGBoost M1`.
 - Strategy catalog prepared for multiple strategies.
 - Public market/sentiment data ingestion needed for training.
-- Feature engineering for RSI/IFR, Open Interest, Long/Short Ratio, and CVD.
+- Feature engineering for RSI/IFR, Open Interest, Long/Short Ratio, and Funding Rate.
 - Chronological train, validation-internal, and holdout partitioning.
 - XGBoost training with early stopping.
 - Automatic walk-forward and holdout validation after successful training.
@@ -108,7 +108,7 @@ Training Orchestrator
 - **Python Backend/API:** owns all frontend contracts, command validation, read models, status projection, and audit event creation.
 - **Training Orchestrator:** coordinates training run lifecycle from `PENDING` to `RUNNING` to `TRAINED` or `FAILED`.
 - **Strategy Catalog:** exposes registered strategy metadata and default parameters. MVP contains `RSI Sentiment XGBoost M1`.
-- **Market/Sentiment Data Ingestion:** loads configured-timeframe spot price data through CCXT and sentiment proxies for Open Interest, Long/Short Ratio, and CVD from configured public sources.
+- **Market/Sentiment Data Ingestion:** loads configured-timeframe spot price data through CCXT and derivative sentiment for Open Interest, Long/Short Ratio, and Funding Rate from configured public sources.
 - **Feature Engineering:** computes RSI/IFR and transforms sentiment features with stationarity and lag rules.
 - **XGBoost Trainer:** trains a binary classifier using chronological partitions and early stopping.
 - **Validation Pipeline:** automatically runs walk-forward validation and holdout backtest after successful training.
@@ -315,7 +315,7 @@ Future trading execution must treat approved models as inputs and must not reint
 - **Sentiment data providers**
   - CCXT is preferred when the configured exchange exposes the required public derivative/sentiment metrics through supported methods.
   - Any non-CCXT sentiment provider must be explicitly approved as a separate adapter before implementation.
-  - Used for Open Interest, Long/Short Ratio, and CVD or CVD-like deltas.
+  - Used for Open Interest, Long/Short Ratio, and Funding Rate.
   - Source freshness and lag behavior must be recorded or conservatively shifted.
 
 ### Internal Integrations
@@ -506,7 +506,7 @@ Latency is not a primary MVP quality attribute because no live inference or exec
 
 - **Context:** training data must be obtained through a stable exchange abstraction instead of coupling the architecture directly to a single exchange API.
 - **Options considered:** direct Bybit public API, direct Binance public API, Coinglass API, CCXT public market-data adapter.
-- **Chosen approach:** CCXT is the primary integration boundary for configured exchange, symbol, timeframe, OHLCV candles, and any exchange-supported public derivative/sentiment metrics. CVD-like data may use provider-supported deltas or remain source-dependent within the approved feature contract.
+- **Chosen approach:** CCXT is the primary integration boundary for configured exchange, symbol, timeframe, OHLCV candles, and exchange-supported public derivative/sentiment metrics: Open Interest, Long/Short Ratio, and Funding Rate.
 - **Consequences:** keeps the MVP aligned with the Native CCXT product direction and avoids hard-coding Bybit as the architectural data origin. If a required sentiment metric is unavailable through CCXT for the configured exchange, dataset construction must fail explicitly or wait for an approved provider adapter.
 - **PRD traceability:** PRD sections 6, 12 decision 4.
 
@@ -592,7 +592,7 @@ No open architecture questions remain for this SAD draft.
 Implementation defaults still to be set during build planning:
 
 - Exact `.env.example` values for training window, internal validation window, holdout window, `N`, `X`, and `Y`.
-- Exact endpoint/provider mapping for CVD-like data after the first public API spike.
+- Exact exchange compatibility matrix for Open Interest, Long/Short Ratio, and Funding Rate across supported CCXT exchanges.
 
 ## 18. Audit
 

@@ -30,6 +30,7 @@ class TrainingRequest(BaseModel):
     data_mode: str | None = Field(default=None, pattern="^(real|synthetic)$")
     sentiment_required: bool | None = None
     symbol: str | None = None
+    sentiment_symbol: str | None = None
     timeframe: str | None = None
     target_n: int | None = Field(default=None, ge=2, le=240)
     take_profit_pct: float | None = Field(default=None, gt=0)

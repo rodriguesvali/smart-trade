@@ -3,6 +3,7 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.adapters.market_data.ccxt_market_data_provider import CcxtMarketDataProvider
+from app.adapters.market_data.ccxt_sentiment_data_provider import CcxtSentimentDataProvider
 from app.adapters.ml.xgboost_training_adapter import RealXGBoostTrainingAdapter, SyntheticXGBoostTrainingAdapter
 from app.adapters.persistence.sqlalchemy_repositories import (
     SqlAlchemyApprovalDecisionRepository,
@@ -32,6 +33,7 @@ def build_training_use_cases(session: Session) -> TrainingUseCases:
             settings.artifact_dir,
             settings.global_random_seed,
             CcxtMarketDataProvider(),
+            CcxtSentimentDataProvider(),
         )
     return TrainingUseCases(
         strategies=strategy_repo,

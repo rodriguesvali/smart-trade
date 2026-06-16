@@ -14,11 +14,11 @@ Build backend em andamento para o MVP resetado do pipeline de treinamento. A fat
 - `timeframe` tratado como parâmetro de treinamento, com default `M1`, e não como metadado fixo da estratégia.
 - `exchange_id`, `data_mode` e `sentiment_required` tratados como parâmetros/configuração de treinamento.
 - Adapter público CCXT para coleta de candles OHLCV reais da exchange configurada.
-- Feature engineering real com pandas/NumPy para RSI/IFR e proxies derivados de OHLCV quando sentimento real não é exigido.
-- Gate explícito para sentimento real: se `sentiment_required=true`, o treinamento falha até existir provider real para Open Interest, Long/Short Ratio e CVD-like delta.
+- Feature engineering real com pandas/NumPy para RSI/IFR e operadores de sentimento vindos da CCXT quando `sentiment_required=true`.
+- Provider CCXT de sentimento para Open Interest, Long/Short Ratio e Funding Rate do mercado perpétuo correspondente.
 - Geração de um novo modelo treinado por execução.
 - Persistência de execução, modelo, métricas, resultados de validação e eventos de auditoria via SQLAlchemy.
-- Treinamento XGBoost determinístico sobre dataset sintético de desenvolvimento, com features RSI/IFR, Open Interest RoC, Long/Short Ratio e CVD delta.
+- Treinamento XGBoost determinístico sobre dataset sintético de desenvolvimento, com features RSI/IFR, Open Interest RoC, Long/Short Ratio e Funding Rate.
 - Treinamento XGBoost com dataset real salvo junto ao artefato do modelo em `.dataset.npz`, permitindo validação reprodutível do mesmo modelo.
 - Artefato XGBoost salvo em formato nativo `.json`.
 - Resposta de modelo expõe `dataset_metadata` com modo, exchange, símbolo, timeframe, fonte, período e janelas cronológicas.
@@ -69,7 +69,7 @@ Checagem executada:
 - `GET /api/strategies`
 - `GET /api/strategies/{strategy_id}`
 - `POST /api/strategies/{strategy_id}/training-runs`
-  - Corpo aceita `exchange_id`, `data_mode`, `sentiment_required`, `symbol`, `timeframe`, `target_n`, `take_profit_pct`, `stop_loss_pct` e `training_rows`.
+  - Corpo aceita `exchange_id`, `data_mode`, `sentiment_required`, `symbol`, `sentiment_symbol`, `timeframe`, `target_n`, `take_profit_pct`, `stop_loss_pct` e `training_rows`.
 - `GET /api/training-runs/{run_id}`
 - `GET /api/strategies/{strategy_id}/models`
 - `GET /api/models/{model_id}`
@@ -84,7 +84,7 @@ Checagem executada:
 - A validação automática prevista no SAD pode ser acionada pelo campo `auto_validate` do endpoint de treinamento. Para o fluxo Swagger solicitado, o default é `false`, permitindo treinar primeiro e depois executar validação manualmente via `POST /api/models/{model_id}/validate`.
 - Alembic ainda não foi materializado nesta fatia; a persistência usa `create_all` no startup para permitir validação rápida do fluxo backend. A próxima fatia de build deve substituir isso por migrações Alembic versionadas.
 - O modo de produto default é `SMART_TRADE_DATA_MODE=real`, usando `ccxt.fetch_ohlcv` para candles fechados. Para testes automatizados, `SMART_TRADE_DATA_MODE=synthetic` evita dependência de rede.
-- Enquanto o provider real de sentimento não existir, `sentiment_required=false` treina com candles reais e proxies OHLCV claramente marcados em `feature_schema.dataset.sentiment_status=ohlcv_proxy_features`; `sentiment_required=true` falha de forma explícita.
+- `sentiment_required=true` exige Open Interest, Long/Short Ratio e Funding Rate via CCXT. `sentiment_required=false` permite fallback para proxies OHLCV claramente marcados em `feature_schema.dataset.sentiment_status=ohlcv_proxy_features`.
 
 ## Evidência de Verificação
 
@@ -93,7 +93,7 @@ Checagem executada:
 - Smoke CCXT público: `binance BTC/USDT M1` retornou 5 candles fechados.
 - Smoke HTTP em modo real com `binance BTC/USDT M1`:
   - `POST /api/strategies/{strategy_id}/training-runs` retornou execução `TRAINED`.
-  - `GET /api/models/{model_id}` retornou `dataset_metadata.mode=real`, `source=ccxt.fetch_ohlcv`, `requested_training_rows=180` e `usable_rows=180`.
+  - `GET /api/models/{model_id}` retornou `dataset_metadata.mode=real`, `sentiment_status=ccxt_derivatives_sentiment`, `requested_training_rows=180` e `usable_rows=180`.
   - `POST /api/models/{model_id}/validate` retornou modelo `VALIDATED`.
 - Smoke HTTP com servidor local:
   - `GET /health` retornou `{"status":"ok"}`.
@@ -125,11 +125,12 @@ Payload mínimo real recomendado no Swagger:
 {
   "exchange_id": "binance",
   "symbol": "BTC/USDT",
+  "sentiment_symbol": "BTC/USDT:USDT",
   "timeframe": "M1",
   "training_rows": 180,
   "target_n": 5,
   "take_profit_pct": 0.0002,
   "stop_loss_pct": 0.0002,
-  "sentiment_required": false
+  "sentiment_required": true
 }
 ```

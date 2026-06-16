@@ -31,7 +31,7 @@ O backend ainda nao possui:
 - Coleta real de candles via CCXT.
 - Persistencia de candles e/ou datasets de treinamento reais.
 - Feature engineering real baseada em dados de mercado.
-- Open Interest, Long/Short Ratio e CVD vindos de fonte real.
+- Open Interest, Long/Short Ratio e Funding Rate vindos de fonte real.
 - Metadados rastreaveis de origem, periodo e qualidade dos dados.
 - Alembic materializado para evolucao de schema.
 
@@ -140,7 +140,7 @@ Criar builder real de dataset:
 - calcular `rsi_14` com janela retrospectiva;
 - transformar `open_interest` em `open_interest_roc`;
 - manter `long_short_ratio` como razao normalizada;
-- transformar `cvd` em `cvd_delta` por candle;
+- consumir `funding_rate` do mercado perpétuo correspondente e alinhar retrospectivamente aos candles;
 - aplicar lag de seguranca em features de sentimento quando configurado;
 - rejeitar dataset com buracos ou features obrigatorias ausentes;
 - produzir `feature_schema` com regras, janelas, lag e fonte de cada feature.
@@ -161,7 +161,7 @@ Implementar a porta `SentimentDataProvider` em duas etapas:
 
 Politica:
 
-- se `SMART_TRADE_SENTIMENT_REQUIRED=true`, treinamento falha sem Open Interest, Long/Short Ratio ou CVD-like delta;
+- se `SMART_TRADE_SENTIMENT_REQUIRED=true`, treinamento falha sem Open Interest, Long/Short Ratio ou Funding Rate;
 - se `false`, features indisponiveis podem ser omitidas somente se a estrategia declarar isso explicitamente;
 - para esta estrategia MVP, as tres features de sentimento seguem como obrigatorias ate nova decisao de produto.
 
@@ -253,8 +253,8 @@ O backend sera considerado funcional para treinamento real quando:
 
 ## Riscos
 
-- **Disponibilidade desigual de sentimento via CCXT:** algumas exchanges podem nao expor Long/Short Ratio ou CVD-like delta pela API publica.
-- **CVD nao padronizado:** pode exigir definicao de proxy aceito ou provider externo aprovado.
+- **Disponibilidade desigual de sentimento via CCXT:** algumas exchanges podem nao expor Open Interest, Long/Short Ratio ou Funding Rate pela API publica.
+- **Granularidade de Funding Rate:** geralmente e mais esparsa que candles M1 e deve ser alinhada retrospectivamente sem look-ahead.
 - **Rate limits:** coleta historica pode exigir paginacao com backoff.
 - **Buracos de candles:** datasets incompletos precisam falhar ou ser reparados com regra explicita.
 - **Look-ahead bias:** qualquer feature com lag ou janela deve ser testada contra vazamento temporal.

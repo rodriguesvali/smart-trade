@@ -17,13 +17,13 @@ def strategy_payload() -> dict:
         "version": "1.0.0",
         "description": (
             "Binary XGBoost training strategy combining RSI/IFR with Open Interest, "
-            "Long/Short Ratio, and CVD-derived sentiment features."
+            "Long/Short Ratio, and Funding Rate sentiment features."
         ),
         "model_family": "XGBoost",
         "status": "AVAILABLE",
         "feature_contract": {
             "technical": ["rsi_14"],
-            "sentiment": ["open_interest_roc", "long_short_ratio", "cvd_delta"],
+            "sentiment": ["open_interest_roc", "long_short_ratio", "funding_rate"],
             "leakage_controls": [
                 "chronological_split",
                 "rolling_or_train_fitted_statistics_only",

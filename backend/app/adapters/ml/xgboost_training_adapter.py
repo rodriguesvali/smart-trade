@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from pathlib import Path
 
 from app.application.ports.market_data import MarketDataProvider
 from app.application.ports.ml import TrainingOutput, ValidationOutput
+from app.application.ports.sentiment import SentimentDataProvider
 from app.adapters.ml.pipeline import (
     build_dataset_from_candles,
     generate_dataset,
@@ -12,6 +14,7 @@ from app.adapters.ml.pipeline import (
     train_xgboost,
     validate_model,
 )
+from app.domain.exceptions import ValidationError
 
 
 class SyntheticXGBoostTrainingAdapter:
@@ -72,10 +75,17 @@ class SyntheticXGBoostTrainingAdapter:
 
 
 class RealXGBoostTrainingAdapter:
-    def __init__(self, artifact_dir: Path, random_seed: int, market_data: MarketDataProvider) -> None:
+    def __init__(
+        self,
+        artifact_dir: Path,
+        random_seed: int,
+        market_data: MarketDataProvider,
+        sentiment_data: SentimentDataProvider,
+    ) -> None:
         self.artifact_dir = artifact_dir
         self.random_seed = random_seed
         self.market_data = market_data
+        self.sentiment_data = sentiment_data
 
     def train(self, *, model_id: str, parameters: dict) -> TrainingOutput:
         rows = int(parameters["training_rows"])
@@ -90,6 +100,19 @@ class RealXGBoostTrainingAdapter:
             timeframe=timeframe,
             rows=candle_rows,
         )
+        sentiment_required = bool(parameters.get("sentiment_required", False))
+        try:
+            sentiment = self.sentiment_data.fetch_sentiment(
+                exchange_id=exchange_id,
+                symbol=str(parameters.get("sentiment_symbol") or symbol),
+                timeframe=timeframe,
+                since=candles[0].timestamp - timedelta(hours=8),
+                until=candles[-1].timestamp,
+            )
+        except ValidationError:
+            if sentiment_required:
+                raise
+            sentiment = None
         dataset = build_dataset_from_candles(
             candles=candles,
             exchange_id=exchange_id,
@@ -101,7 +124,8 @@ class RealXGBoostTrainingAdapter:
             stop_loss_pct=float(parameters["stop_loss_pct"]),
             validation_ratio=float(parameters["validation_ratio"]),
             holdout_ratio=float(parameters["holdout_ratio"]),
-            sentiment_required=bool(parameters.get("sentiment_required", False)),
+            sentiment_required=sentiment_required,
+            sentiment=sentiment,
         )
         artifact_path = self.artifact_dir / f"{model_id}.json"
         dataset_path = self.artifact_dir / f"{model_id}.dataset.npz"

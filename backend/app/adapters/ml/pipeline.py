@@ -10,10 +10,11 @@ from sklearn.metrics import confusion_matrix, f1_score, log_loss, precision_scor
 from xgboost import XGBClassifier
 
 from app.application.ports.market_data import MarketCandle
+from app.application.ports.sentiment import SentimentSeries
 from app.domain.exceptions import ValidationError
 
 
-FEATURE_NAMES = ["rsi_14", "open_interest_roc", "long_short_ratio", "cvd_delta"]
+FEATURE_NAMES = ["rsi_14", "open_interest_roc", "long_short_ratio", "funding_rate"]
 
 
 @dataclass(frozen=True)
@@ -56,8 +57,7 @@ def generate_dataset(
     open_interest_roc[0] = 0
 
     long_short_ratio = 1.0 + 0.18 * np.sin(np.linspace(0, 15, price.size)) + rng.normal(0, 0.035, price.size)
-    cvd = np.cumsum(np.sign(deltas) * rng.uniform(50, 400, price.size))
-    cvd_delta = np.diff(cvd, prepend=cvd[0])
+    funding_rate = rng.normal(0.00001, 0.00005, price.size)
 
     start = 40
     usable = rows
@@ -67,7 +67,7 @@ def generate_dataset(
             rsi[start:end],
             open_interest_roc[start:end],
             long_short_ratio[start:end],
-            cvd_delta[start:end] / 1000.0,
+            funding_rate[start:end],
         ]
     )
 
@@ -95,7 +95,7 @@ def generate_dataset(
         "feature_names": FEATURE_NAMES,
         "stationarity_rules": {
             "open_interest_roc": "rate_of_change_retrospective",
-            "cvd_delta": "per_candle_delta_scaled",
+            "funding_rate": "native_rate",
             "long_short_ratio": "native_ratio",
             "rsi_14": "bounded_indicator",
         },
@@ -121,10 +121,11 @@ def build_dataset_from_candles(
     validation_ratio: float,
     holdout_ratio: float,
     sentiment_required: bool,
+    sentiment: SentimentSeries | None = None,
 ) -> DatasetBundle:
-    if sentiment_required:
+    if sentiment_required and sentiment is None:
         raise ValidationError(
-            "Real sentiment data is required, but no CCXT sentiment provider is available for this strategy yet"
+            "Real sentiment data is required, but no CCXT sentiment provider returned Open Interest, Long/Short Ratio, and Funding Rate"
         )
     minimum_rows = training_rows + target_n
     if len(candles) < minimum_rows:
@@ -153,14 +154,16 @@ def build_dataset_from_candles(
     rs = avg_gain / avg_loss.replace(0.0, np.nan)
     frame["rsi_14"] = (100 - (100 / (1 + rs))).fillna(50.0)
 
-    # These are OHLCV-derived placeholders, not true sentiment feeds. They keep
-    # the real-candle flow trainable while the CCXT sentiment provider is added.
-    frame["open_interest_roc"] = frame["volume"].pct_change().replace([np.inf, -np.inf], 0.0).fillna(0.0)
-    returns = frame["close"].pct_change().replace([np.inf, -np.inf], 0.0).fillna(0.0)
-    rolling_scale = returns.rolling(window=30, min_periods=5).std().replace(0.0, np.nan).fillna(returns.std() or 1e-9)
-    frame["long_short_ratio"] = (1.0 + (returns / rolling_scale).clip(-0.25, 0.25)).fillna(1.0)
-    cvd_proxy = (np.sign(deltas) * frame["volume"]).cumsum()
-    frame["cvd_delta"] = cvd_proxy.diff().fillna(0.0)
+    sentiment_status = "ccxt_derivatives_sentiment" if sentiment is not None else "ohlcv_proxy_features"
+    sentiment_metadata = sentiment.metadata if sentiment is not None else {}
+    if sentiment is None:
+        frame["open_interest_roc"] = frame["volume"].pct_change().replace([np.inf, -np.inf], 0.0).fillna(0.0)
+        returns = frame["close"].pct_change().replace([np.inf, -np.inf], 0.0).fillna(0.0)
+        rolling_scale = returns.rolling(window=30, min_periods=5).std().replace(0.0, np.nan).fillna(returns.std() or 1e-9)
+        frame["long_short_ratio"] = (1.0 + (returns / rolling_scale).clip(-0.25, 0.25)).fillna(1.0)
+        frame["funding_rate"] = 0.0
+    else:
+        frame = _merge_sentiment_frame(frame, sentiment)
 
     feature_frame = frame[FEATURE_NAMES].replace([np.inf, -np.inf], 0.0).fillna(0.0)
     start_index = len(frame) - target_n - training_rows
@@ -189,7 +192,8 @@ def build_dataset_from_candles(
             "timeframe": timeframe,
             "source": "ccxt.fetch_ohlcv",
             "sentiment_required": sentiment_required,
-            "sentiment_status": "ohlcv_proxy_features",
+            "sentiment_status": sentiment_status,
+            "sentiment_metadata": sentiment_metadata,
             "raw_candle_count": len(candles),
             "requested_training_rows": int(training_rows),
             "usable_rows": int(usable),
@@ -200,16 +204,16 @@ def build_dataset_from_candles(
             "split_indices": split_indices,
         },
         "stationarity_rules": {
-            "open_interest_roc": "ohlcv_volume_rate_of_change_proxy",
-            "cvd_delta": "ohlcv_directional_volume_delta_proxy",
-            "long_short_ratio": "ohlcv_return_pressure_proxy",
+            "open_interest_roc": "ccxt_derivatives_rate_of_change" if sentiment else "ohlcv_volume_rate_of_change_proxy",
+            "funding_rate": "ccxt_derivatives_native_rate" if sentiment else "zero_proxy_no_funding_feed",
+            "long_short_ratio": "ccxt_derivatives_native_ratio" if sentiment else "ohlcv_return_pressure_proxy",
             "rsi_14": "bounded_indicator",
         },
         "leakage_controls": {
             "global_statistics": "forbidden",
             "rolling_windows": "retrospective_only",
             "closed_candles_only": True,
-            "sentiment_lag": "not_applied_proxy_features",
+            "sentiment_lag": "merge_asof_backward_only" if sentiment else "not_applied_proxy_features",
         },
     }
     return DatasetBundle(features, labels, future_returns, split_indices, metadata)
@@ -381,6 +385,34 @@ def _split_indices(usable: int, validation_ratio: float, holdout_ratio: float) -
 def _ensure_no_duplicate_timestamps(frame: pd.DataFrame) -> None:
     if frame["timestamp"].duplicated().any():
         raise ValidationError("Market data contains duplicate candle timestamps")
+
+
+def _merge_sentiment_frame(frame: pd.DataFrame, sentiment: SentimentSeries) -> pd.DataFrame:
+    sentiment_frame = pd.DataFrame(
+        [
+            {
+                "timestamp": point.timestamp,
+                "open_interest": point.open_interest,
+                "long_short_ratio": point.long_short_ratio,
+                "funding_rate": point.funding_rate,
+            }
+            for point in sentiment.points
+        ]
+    ).sort_values("timestamp")
+    if sentiment_frame.empty:
+        raise ValidationError("Sentiment provider returned no usable rows")
+    merged = pd.merge_asof(
+        frame.sort_values("timestamp"),
+        sentiment_frame,
+        on="timestamp",
+        direction="backward",
+    )
+    required = ["open_interest", "long_short_ratio", "funding_rate"]
+    if merged[required].isna().any().any():
+        missing = {column: int(merged[column].isna().sum()) for column in required}
+        raise ValidationError(f"Sentiment data does not cover all candle timestamps: {missing}")
+    merged["open_interest_roc"] = merged["open_interest"].pct_change().replace([np.inf, -np.inf], 0.0).fillna(0.0)
+    return merged.drop(columns=["open_interest"])
 
 
 def _ml_metrics(labels: np.ndarray, probabilities: np.ndarray) -> dict:
