@@ -34,13 +34,14 @@ Primeira versão do frontend Angular + PrimeNG implementada para o MVP do pipeli
   - `POST /api/models/{model_id}/validate`;
   - `POST /api/models/{model_id}/approve`;
   - `POST /api/models/{model_id}/reject`;
+  - `DELETE /api/models/{model_id}`;
   - `GET /api/audit-events`.
 - Tela de estratégias com tabela e ação `Open`.
 - Tela de detalhe da estratégia com retorno para lista, parâmetros default, modelos treinados e início de treinamento.
 - Dialog de treinamento com Reactive Forms, validações básicas e aviso de retenção pública da Binance.
 - Campos `Take Profit` e `Stop Loss` exibidos em percentual para o usuário e convertidos para fração decimal no payload do backend.
 - Polling de execução assíncrona via `GET /api/training-runs/{run_id}`.
-- Tela de detalhe do modelo com scorecard de métricas, validação, aprovação e rejeição com comentário.
+- Tela de detalhe do modelo com scorecard de métricas, validação, aprovação, rejeição com comentário e exclusão de modelo `REJECTED` após confirmação.
 - Tela de eventos de auditoria com payload JSON expandível.
 - CORS habilitado no backend para `http://localhost:4200` e `http://127.0.0.1:4200`.
 - Tasks/launch do VS Code atualizados para frontend, browser, Swagger e compound full stack.
@@ -78,9 +79,13 @@ Decisões:
   - standalone app;
   - routing;
   - `provideHttpClient()`;
+  - `HttpClient.delete()` com corpo;
+  - `Router.navigate()`;
   - lazy-loaded routes;
   - Reactive Forms.
 - PrimeNG MCP:
+  - instalação/setup standalone;
+  - `confirmdialog` slots disponíveis;
   - data components: `table`, `paginator`, `timeline`;
   - form components: `inputtext`, `inputnumber`, `select`, `toggleswitch`, `textarea`;
   - overlay components: `dialog`, `confirmdialog`, `tooltip`.

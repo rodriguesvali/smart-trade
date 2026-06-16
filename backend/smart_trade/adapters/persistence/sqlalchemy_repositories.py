@@ -163,6 +163,13 @@ class SqlAlchemyTrainedModelRepository:
                 setattr(record, key, value)
         self.session.commit()
 
+    def delete(self, model_id: str) -> None:
+        record = self.session.get(TrainedModelRecord, model_id)
+        if record is None:
+            return
+        self.session.delete(record)
+        self.session.commit()
+
 
 class SqlAlchemyValidationResultRepository:
     def __init__(self, session: Session) -> None:

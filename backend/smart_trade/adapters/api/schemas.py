@@ -109,6 +109,24 @@ class ApprovalRequest(BaseModel):
     comments: str | None = None
 
 
+class DeleteModelRequest(BaseModel):
+    operator: str = "swagger-user"
+    confirmed: bool = Field(
+        default=False,
+        description="Must be true to delete a REJECTED model from operational views.",
+    )
+    comments: str | None = None
+
+
+class DeletedModelRead(BaseModel):
+    model_id: str
+    run_id: str
+    strategy_id: str
+    previous_status: str
+    status: str
+    artifact_cleanup: dict[str, Any]
+
+
 class AuditEventRead(BaseModel):
     id: str
     event_type: str

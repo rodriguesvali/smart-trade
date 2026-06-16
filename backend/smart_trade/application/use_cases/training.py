@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from smart_trade.application.ports.clock import Clock, IdGenerator
-from smart_trade.application.ports.ml import ModelTrainer, ModelValidator
+from smart_trade.application.ports.ml import ArtifactDeletionResult, ModelArtifactStore, ModelTrainer, ModelValidator
 from smart_trade.application.ports.repositories import (
     ApprovalDecisionRepository,
     AuditEventRepository,
@@ -14,7 +14,7 @@ from smart_trade.application.ports.repositories import (
 )
 from smart_trade.domain.entities import ApprovalRecord, AuditEvent, TrainedModel, TrainingRun, ValidationResult
 from smart_trade.domain.enums import ApprovalDecision, TrainedModelStatus, TrainingRunStatus
-from smart_trade.domain.exceptions import NotFoundError, ValidationError
+from smart_trade.domain.exceptions import InvalidStateTransitionError, NotFoundError, ValidationError
 
 
 @dataclass(frozen=True)
@@ -31,6 +31,23 @@ class DecisionCommand:
     comments: str | None
 
 
+@dataclass(frozen=True)
+class DeleteModelCommand:
+    model_id: str
+    operator: str
+    confirmed: bool
+    comments: str | None
+
+
+@dataclass(frozen=True)
+class DeletedModelResult:
+    model_id: str
+    run_id: str
+    strategy_id: str
+    previous_status: TrainedModelStatus
+    artifact_cleanup: ArtifactDeletionResult
+
+
 class TrainingUseCases:
     def __init__(
         self,
@@ -43,6 +60,7 @@ class TrainingUseCases:
         audit_events: AuditEventRepository,
         trainer: ModelTrainer,
         validator: ModelValidator,
+        artifact_store: ModelArtifactStore,
         clock: Clock,
         ids: IdGenerator,
     ) -> None:
@@ -54,6 +72,7 @@ class TrainingUseCases:
         self.audit_events = audit_events
         self.trainer = trainer
         self.validator = validator
+        self.artifact_store = artifact_store
         self.clock = clock
         self.ids = ids
 
@@ -193,6 +212,62 @@ class TrainingUseCases:
 
     def reject_model(self, command: DecisionCommand) -> TrainedModel:
         return self._decide(command, ApprovalDecision.REJECTED)
+
+    def delete_rejected_model(self, command: DeleteModelCommand) -> DeletedModelResult:
+        if not command.confirmed:
+            raise ValidationError("Rejected model deletion requires explicit confirmation")
+
+        model = self.get_model(command.model_id)
+        if model.status != TrainedModelStatus.REJECTED:
+            raise InvalidStateTransitionError("Only REJECTED models can be deleted")
+
+        try:
+            artifact_cleanup = self.artifact_store.delete(model.artifact_path)
+        except OSError as exc:
+            self._audit(
+                "MODEL_DELETE_FAILED",
+                "Rejected model artifact cleanup failed",
+                {
+                    "model_id": model.id,
+                    "run_id": model.run_id,
+                    "strategy_id": model.strategy_id,
+                    "previous_status": model.status.value,
+                    "artifact_path": model.artifact_path,
+                    "operator": command.operator,
+                    "comments": command.comments,
+                    "error": str(exc),
+                },
+            )
+            raise ValidationError(f"Rejected model artifact cleanup failed: {exc}") from exc
+
+        result = DeletedModelResult(
+            model_id=model.id,
+            run_id=model.run_id,
+            strategy_id=model.strategy_id,
+            previous_status=model.status,
+            artifact_cleanup=artifact_cleanup,
+        )
+        self.models.delete(model.id)
+        self._audit(
+            "MODEL_DELETED",
+            "Rejected model deleted from operational views",
+            {
+                "model_id": model.id,
+                "run_id": model.run_id,
+                "strategy_id": model.strategy_id,
+                "previous_status": model.status.value,
+                "artifact_path": model.artifact_path,
+                "operator": command.operator,
+                "comments": command.comments,
+                "artifact_cleanup": {
+                    "artifact_path": artifact_cleanup.artifact_path,
+                    "artifact_deleted": artifact_cleanup.artifact_deleted,
+                    "dataset_path": artifact_cleanup.dataset_path,
+                    "dataset_deleted": artifact_cleanup.dataset_deleted,
+                },
+            },
+        )
+        return result
 
     def _decide(self, command: DecisionCommand, decision: ApprovalDecision) -> TrainedModel:
         model = self.get_model(command.model_id)

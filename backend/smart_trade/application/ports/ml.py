@@ -21,6 +21,14 @@ class ValidationOutput:
     operational_metrics: dict
 
 
+@dataclass(frozen=True)
+class ArtifactDeletionResult:
+    artifact_path: str
+    artifact_deleted: bool
+    dataset_path: str | None = None
+    dataset_deleted: bool = False
+
+
 class ModelTrainer(Protocol):
     def train(self, *, model_id: str, parameters: dict) -> TrainingOutput:
         raise NotImplementedError
@@ -30,3 +38,7 @@ class ModelValidator(Protocol):
     def validate(self, *, artifact_path: str, parameters: dict) -> ValidationOutput:
         raise NotImplementedError
 
+
+class ModelArtifactStore(Protocol):
+    def delete(self, artifact_path: str) -> ArtifactDeletionResult:
+        raise NotImplementedError

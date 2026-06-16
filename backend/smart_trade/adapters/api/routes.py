@@ -3,7 +3,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from smart_trade.application.use_cases.training import DecisionCommand, TrainingCommand, TrainingUseCases
+from smart_trade.application.use_cases.training import (
+    DecisionCommand,
+    DeleteModelCommand,
+    DeletedModelResult,
+    TrainingCommand,
+    TrainingUseCases,
+)
 from smart_trade.domain.entities import AuditEvent, TrainedModel, TrainingRun, TrainingStrategy, ValidationResult
 from smart_trade.domain.exceptions import DomainError, InvalidStateTransitionError, NotFoundError, ValidationError
 from smart_trade.infrastructure.container import build_training_use_cases
@@ -11,6 +17,8 @@ from smart_trade.infrastructure.database import get_session
 from smart_trade.adapters.api.schemas import (
     ApprovalRequest,
     AuditEventRead,
+    DeletedModelRead,
+    DeleteModelRequest,
     StrategyDetail,
     StrategySummary,
     TrainedModelDetail,
@@ -139,6 +147,26 @@ def reject_trained_model(
         raise _http_error(exc) from exc
 
 
+@router.delete("/models/{model_id}", response_model=DeletedModelRead, tags=["models"])
+def delete_rejected_model(
+    model_id: str,
+    request: DeleteModelRequest,
+    use_cases: TrainingUseCases = Depends(get_use_cases),
+) -> DeletedModelRead:
+    try:
+        result = use_cases.delete_rejected_model(
+            DeleteModelCommand(
+                model_id=model_id,
+                operator=request.operator,
+                confirmed=request.confirmed,
+                comments=request.comments,
+            )
+        )
+        return _deleted_model_read(result)
+    except DomainError as exc:
+        raise _http_error(exc) from exc
+
+
 @router.get("/audit-events", response_model=list[AuditEventRead], tags=["audit"])
 def list_audit_events(use_cases: TrainingUseCases = Depends(get_use_cases)) -> list[AuditEventRead]:
     return [_audit_read(event) for event in use_cases.list_audit_events()]
@@ -201,6 +229,22 @@ def _model_detail(model: TrainedModel) -> TrainedModelDetail:
         training_metrics=model.training_metrics,
         validation_summary=model.validation_summary,
         validation_results=[_validation_read(result) for result in model.validation_results],
+    )
+
+
+def _deleted_model_read(result: DeletedModelResult) -> DeletedModelRead:
+    return DeletedModelRead(
+        model_id=result.model_id,
+        run_id=result.run_id,
+        strategy_id=result.strategy_id,
+        previous_status=result.previous_status.value,
+        status="DELETED_FROM_OPERATIONAL_VIEWS",
+        artifact_cleanup={
+            "artifact_path": result.artifact_cleanup.artifact_path,
+            "artifact_deleted": result.artifact_cleanup.artifact_deleted,
+            "dataset_path": result.artifact_cleanup.dataset_path,
+            "dataset_deleted": result.artifact_cleanup.dataset_deleted,
+        },
     )
 
 

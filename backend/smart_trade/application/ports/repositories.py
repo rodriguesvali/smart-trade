@@ -41,6 +41,9 @@ class TrainedModelRepository(Protocol):
     def save(self, model: TrainedModel) -> None:
         raise NotImplementedError
 
+    def delete(self, model_id: str) -> None:
+        raise NotImplementedError
+
 
 class ValidationResultRepository(Protocol):
     def save(self, result: ValidationResult) -> None:

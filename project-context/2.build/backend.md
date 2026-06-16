@@ -29,6 +29,7 @@ Build backend em andamento para o MVP resetado do pipeline de treinamento. A fat
 - Endpoint explícito para executar validação do modelo pelo Swagger.
 - Scorecard de validação com métricas de ML e métricas operacionais simuladas.
 - Endpoints de aprovação/rejeição incluídos como continuação natural do ciclo, com rejeição exigindo comentário.
+- Endpoint para excluir modelos já `REJECTED`, com confirmação explícita, limpeza de artefatos, remoção das listas operacionais e evento de auditoria `MODEL_DELETED`.
 - Endpoint `GET /api/audit-events`.
 
 ## Arquitetura Hexagonal + DDD
@@ -38,7 +39,7 @@ Após revisão arquitetural, o backend foi reorganizado para separar domínio, a
 - `backend/smart_trade/domain/`
   - Entidades e regras de negócio independentes de framework.
   - Enums de status para estratégias, execuções, modelos e decisões.
-  - Políticas de transição: aprovação apenas de modelo `VALIDATED`, rejeição com comentário obrigatório, finalização imutável de modelos aprovados/rejeitados.
+  - Políticas de transição: aprovação apenas de modelo `VALIDATED`, rejeição com comentário obrigatório, finalização imutável de modelos aprovados/rejeitados e exclusão permitida somente para modelo `REJECTED`.
 - `backend/smart_trade/application/ports/`
   - Portas para repositórios, trainer, validator, market data, relógio e geração de IDs.
 - `backend/smart_trade/application/use_cases/`
@@ -71,6 +72,8 @@ Checagem executada:
 
 - FastAPI via Context7: path operations com response models e documentação OpenAPI automática.
 - SQLAlchemy 2.0 ORM/Core via Context7: `create_engine`, `sessionmaker`, declarative mappings, consultas ORM com `select()`/`Session.execute()`, `inspect()`/`get_columns()` e DDL textual para migração local de compatibilidade.
+- SQLAlchemy 2.0 ORM via Context7: `Session.delete()` marca instâncias para deleção e emite o `DELETE` no próximo `commit`/`flush`, preservando cascades ORM configurados.
+- FastAPI via Context7: operações `DELETE`, request body com modelo Pydantic, `response_model` e documentação OpenAPI automática.
 - CCXT via Context7: métodos `fetchOpenInterestHistory` e `fetchLongShortRatioHistory`, parâmetros `since`, `limit` e `params.until`.
 - XGBoost via Context7: `save_model`/`load_model` com formatos nativos `.json` e `.ubj`.
 - Binance Developers: endpoints públicos de Open Interest Statistics, Long/Short Ratio e Taker Long/Short Ratio documentam retenção aproximada de 30 dias/1 mês.
@@ -88,6 +91,10 @@ Checagem executada:
 - `POST /api/models/{model_id}/validate`
 - `POST /api/models/{model_id}/approve`
 - `POST /api/models/{model_id}/reject`
+- `DELETE /api/models/{model_id}`
+  - Corpo exige `confirmed=true`, aceita `operator` e `comments`.
+  - Retorna `409` se o modelo não estiver em `REJECTED`.
+  - Em sucesso, remove o modelo das leituras operacionais, apaga o artefato `.json` e dataset `.dataset.npz` quando existirem, e registra `MODEL_DELETED`.
 - `GET /api/audit-events`
 
 ## Observações
@@ -106,6 +113,7 @@ Checagem executada:
 
 - `cd backend && .venv/bin/python -m pytest -q tests`: 8 passed.
 - Checagem arquitetural: `rg -n "fastapi|sqlalchemy|ccxt|pandas|xgboost|sklearn|numpy|Path\\(" backend/smart_trade/domain backend/smart_trade/application` sem ocorrências.
+- Teste de exclusão de modelo rejeitado cobre: bloqueio para `VALIDATED`, rejeição com comentário, `DELETE /api/models/{model_id}` com confirmação, remoção de `GET /api/models/{model_id}`, ausência na lista por estratégia, remoção de artefatos e evento `MODEL_DELETED`.
 - Validação JSON: `.vscode/launch.json` e `.vscode/tasks.json` válidos via `python -m json.tool`.
 - Smoke interno do builder real: dataset real em memória produziu `(252, 4)` features com metadados `mode=real`.
 - Smoke CCXT público: `binance BTC/USDT M5` retornou candles fechados.

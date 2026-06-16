@@ -105,3 +105,18 @@ export interface ApprovalRequest {
   operator: string;
   comments?: string | null;
 }
+
+export interface DeleteModelRequest {
+  operator: string;
+  confirmed: boolean;
+  comments?: string | null;
+}
+
+export interface DeletedModelRead {
+  model_id: string;
+  run_id: string;
+  strategy_id: string;
+  previous_status: string;
+  status: string;
+  artifact_cleanup: Record<string, unknown>;
+}

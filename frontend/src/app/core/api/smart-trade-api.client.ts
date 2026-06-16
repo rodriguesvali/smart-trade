@@ -6,6 +6,8 @@ import { environment } from '../config/environment.model';
 import { AuditEventRead } from '../../features/strategies/models/audit-event.model';
 import {
   ApprovalRequest,
+  DeletedModelRead,
+  DeleteModelRequest,
   StrategyDetail,
   StrategySummary,
   TrainedModelDetail,
@@ -57,6 +59,10 @@ export class SmartTradeApiClient {
 
   rejectModel(modelId: string, request: ApprovalRequest): Observable<TrainedModelDetail> {
     return this.http.post<TrainedModelDetail>(`${this.baseUrl}/api/models/${modelId}/reject`, request);
+  }
+
+  deleteModel(modelId: string, request: DeleteModelRequest): Observable<DeletedModelRead> {
+    return this.http.delete<DeletedModelRead>(`${this.baseUrl}/api/models/${modelId}`, { body: request });
   }
 
   listAuditEvents(): Observable<AuditEventRead[]> {

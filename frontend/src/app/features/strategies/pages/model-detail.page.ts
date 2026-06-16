@@ -42,6 +42,9 @@ import { TrainedModelDetail } from '../models/strategy.model';
           <p-button icon="pi pi-check-circle" label="Validate" size="small" [disabled]="model()!.status === 'APPROVED' || model()!.status === 'REJECTED' || validating()" (onClick)="validate()" />
           <p-button icon="pi pi-thumbs-up" label="Approve" size="small" severity="success" [disabled]="model()!.status !== 'VALIDATED'" (onClick)="approve()" />
           <p-button icon="pi pi-thumbs-down" label="Reject" size="small" severity="danger" [disabled]="model()!.status === 'APPROVED' || model()!.status === 'REJECTED'" (onClick)="rejectVisible.set(true)" />
+          @if (model()!.status === 'REJECTED') {
+            <p-button icon="pi pi-trash" label="Delete" size="small" severity="danger" [outlined]="true" (onClick)="deleteRejectedModel()" />
+          }
         </div>
       </div>
 
@@ -151,6 +154,34 @@ export class ModelDetailPage {
         this.messages.add({ severity: 'success', summary: 'Model rejected', detail: updated.id });
       },
       error: (error) => this.messages.add({ severity: 'error', summary: 'Rejection failed', detail: error.message }),
+    });
+  }
+
+  deleteRejectedModel(): void {
+    const model = this.model();
+    if (!model || model.status !== 'REJECTED') {
+      return;
+    }
+    this.confirmation.confirm({
+      header: 'Delete rejected model',
+      message: 'Delete this rejected model from operational views and remove its stored artifacts?',
+      icon: 'pi pi-exclamation-triangle',
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => {
+        this.api
+          .deleteModel(model.id, {
+            operator: 'dashboard-user',
+            confirmed: true,
+            comments: 'Deleted from model detail',
+          })
+          .subscribe({
+            next: () => {
+              this.messages.add({ severity: 'success', summary: 'Model deleted', detail: model.id });
+              this.back();
+            },
+            error: (error) => this.messages.add({ severity: 'error', summary: 'Delete failed', detail: error.message }),
+          });
+      },
     });
   }
 

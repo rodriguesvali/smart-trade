@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from smart_trade.adapters.market_data.ccxt_market_data_provider import CcxtMarketDataProvider
 from smart_trade.adapters.market_data.ccxt_sentiment_data_provider import CcxtSentimentDataProvider
+from smart_trade.adapters.ml.artifact_store import LocalModelArtifactStore
 from smart_trade.adapters.ml.xgboost_training_adapter import RealXGBoostTrainingAdapter, SyntheticXGBoostTrainingAdapter
 from smart_trade.adapters.persistence.sqlalchemy_repositories import (
     SqlAlchemyApprovalDecisionRepository,
@@ -44,6 +45,7 @@ def build_training_use_cases(session: Session) -> TrainingUseCases:
         audit_events=audit_repo,
         trainer=ml_adapter,
         validator=ml_adapter,
+        artifact_store=LocalModelArtifactStore(),
         clock=SystemClock(),
         ids=UuidGenerator(),
     )

@@ -6,9 +6,9 @@ The MVP architecture prioritizes a safe and traceable training lifecycle before 
 
 Core principles:
 
-- **Training-first scope:** deliver only the strategy catalog, training execution, automatic validation, model evidence, and manual approval/rejection flow.
+- **Training-first scope:** deliver only the strategy catalog, training execution, automatic validation, model evidence, manual approval/rejection flow, and rejected-model cleanup.
 - **Prepared for multiple strategies:** implement one strategy now, but use a strategy catalog and stable strategy contracts that allow future additions.
-- **Model as immutable output:** every training run creates a new trained model record and native XGBoost artifact.
+- **Model as immutable output:** every training run creates a new trained model record and native XGBoost artifact; only models already marked `REJECTED` may be deleted through an explicit audited cleanup command.
 - **No hidden validation:** successful training automatically starts validation, and approval is blocked until the trained model reaches `VALIDATED`.
 - **No temporal leakage:** feature generation, scaling, lagging, splitting, early stopping, walk-forward validation, and holdout backtest must preserve chronological boundaries.
 - **Backend-mediated frontend access:** Angular + PrimeNG consumes only Python backend/API contracts and never reads MySQL, artifacts, logs, API keys, or external market APIs directly.
@@ -29,7 +29,7 @@ Primary concerns:
 
 - Correct chronological data handling.
 - Model reproducibility and portability.
-- Traceable approval decisions.
+- Traceable approval and cleanup decisions.
 - Safe failure behavior.
 - Minimal frontend with no direct privileged access.
 - Database migration governance.
@@ -39,7 +39,7 @@ Primary concerns:
 In scope:
 
 - Angular + PrimeNG shell with dashboard frame and `XGBoost Strategies` menu.
-- Backend API for strategy listing, strategy detail, training command, training/model status, validation evidence, and approval/rejection.
+- Backend API for strategy listing, strategy detail, training command, training/model status, validation evidence, approval/rejection, and rejected-model deletion.
 - One implemented strategy: `RSI Sentiment XGBoost`.
 - Strategy catalog prepared for multiple strategies.
 - Public market/sentiment data ingestion needed for training.
@@ -48,6 +48,7 @@ In scope:
 - XGBoost training with early stopping.
 - Automatic walk-forward and holdout validation after successful training.
 - Manual approval/rejection of validated models.
+- Deletion of models that are already `REJECTED`, mediated by backend/API and recorded in audit.
 - MySQL persistence with Alembic migrations.
 - Native XGBoost artifact storage in `.json` or `.ubj`.
 - Audit events and logs for critical lifecycle steps.
@@ -104,7 +105,7 @@ Training Orchestrator
 
 ### Element Catalog
 
-- **Angular + PrimeNG frontend:** presents dashboard shell, strategy table, strategy detail, trained-model table, validation scorecard, and approval/rejection controls.
+- **Angular + PrimeNG frontend:** presents dashboard shell, strategy table, strategy detail, trained-model table, validation scorecard, approval/rejection controls, and a delete control only for `REJECTED` models.
 - **Python Backend/API:** owns all frontend contracts, command validation, read models, status projection, and audit event creation.
 - **Training Orchestrator:** coordinates training run lifecycle from `PENDING` to `RUNNING` to `TRAINED` or `FAILED`.
 - **Strategy Catalog:** exposes registered strategy metadata and default parameters. MVP contains `RSI Sentiment XGBoost`.
@@ -112,7 +113,7 @@ Training Orchestrator
 - **Feature Engineering:** computes RSI/IFR and transforms sentiment features with stationarity and lag rules.
 - **XGBoost Trainer:** trains a binary classifier using chronological partitions and early stopping.
 - **Validation Pipeline:** automatically runs walk-forward validation and holdout backtest after successful training.
-- **Model Registry:** persists trained model metadata, lifecycle status, artifact path, feature schema, validation evidence, and approval decision linkage.
+- **Model Registry:** persists trained model metadata, lifecycle status, artifact path, feature schema, validation evidence, approval decision linkage, and deletion metadata/tombstones for rejected-model cleanup.
 - **MySQL:** durable source of truth for catalog, runs, models, validation results, decisions, and audit events.
 - **Model Artifact Directory:** stores native XGBoost `.json` or `.ubj` files.
 - **Log/Event Sink:** records operational events and errors for observability and audit.
@@ -146,7 +147,7 @@ Shared: log/event storage
 - **Python Backend/API process**
   - Exposes REST-style API contracts.
   - Validates user commands.
-  - Creates training runs and approval/rejection decisions.
+  - Creates training runs, approval/rejection decisions, and rejected-model deletion records.
   - Serves read models for strategy, model status, metrics, and audit events.
   - Does not execute private exchange orders in this MVP.
 
@@ -180,6 +181,7 @@ Shared: log/event storage
 - If training succeeds but validation fails, the model status becomes `FAILED`, with validation failure evidence.
 - If API restarts while training is running, status must be recoverable from MySQL. The MVP may mark interrupted runs as `FAILED` on recovery unless resumable jobs are explicitly implemented.
 - If artifact write fails, the model cannot become `TRAINED` or `VALIDATED`.
+- If rejected-model deletion fails while removing the artifact, the backend must leave an explicit failure audit event and avoid reporting successful deletion.
 
 ## 6. Data View
 
@@ -195,7 +197,7 @@ Shared: log/event storage
 
 - `trained_models`
   - One row per model produced by a successful training run.
-  - Includes model ID, run ID, strategy ID/version, status, artifact path, artifact format, feature schema hash, target parameters, and timestamps.
+  - Includes model ID, run ID, strategy ID/version, status, artifact path, artifact format, feature schema hash, target parameters, timestamps, and deletion metadata when a rejected model is removed from operational views.
 
 - `training_validation_results`
   - Stores walk-forward and holdout evidence.
@@ -206,7 +208,7 @@ Shared: log/event storage
   - Includes model ID, decision, timestamp, operator/agent identifier, and comments.
 
 - `audit_events`
-  - Append-oriented event log for training, model creation, validation, approval, rejection, and failures.
+  - Append-oriented event log for training, model creation, validation, approval, rejection, rejected-model deletion, and failures.
 
 ### Data Rules
 
@@ -218,6 +220,10 @@ Shared: log/event storage
 - Feature transformations must store enough metadata to prove lag and leakage rules were applied.
 - It is expressly prohibited to use global aggregate functions in MySQL or vectorized Pandas/NumPy transformations fitted over the complete dataset. Scale parameters such as z-score, min-max, means, and standard deviations must be fitted only with the training partition and then applied forward to internal validation and holdout using retrospective/rolling rules.
 - In `training_approval_decisions`, operator comments are optional for `APPROVED` decisions and mandatory for `REJECTED` decisions.
+- A model deletion command is valid only when the current model status is `REJECTED`.
+- Rejected-model deletion must be initiated through the backend/API, must require explicit operator confirmation, and must emit an audit event containing at minimum model ID, run ID, strategy ID, previous status, artifact path, operator, timestamp, and reason/comment when provided.
+- Deleted rejected models are removed from default strategy/model list views. The audit stream remains append-only and must still expose the deletion event.
+- `APPROVED`, `VALIDATED`, `VALIDATING`, `TRAINED`, and `FAILED` models must not be deleted by the rejected-model cleanup command.
 
 ### Alembic Governance
 
@@ -242,6 +248,7 @@ TRAINED -> VALIDATING -> VALIDATED -> APPROVED
 TRAINED -> VALIDATING -> VALIDATED -> REJECTED
 TRAINED -> VALIDATING -> FAILED
 TRAINED -> REJECTED
+REJECTED -> DELETED_FROM_OPERATIONAL_VIEWS
 ```
 
 ### Training Flow
@@ -272,6 +279,16 @@ TRAINED -> REJECTED
 3. Backend validates status and artifact/metric completeness.
 4. Decision is persisted.
 5. Model status becomes `APPROVED` or `REJECTED`.
+
+### Rejected-Model Deletion Flow
+
+1. Operator opens a model with status `REJECTED`.
+2. Frontend displays a destructive delete action only for `REJECTED` models.
+3. Backend receives the deletion command with operator identity and optional reason/comment.
+4. Backend rechecks the current model status and rejects the command unless status is exactly `REJECTED`.
+5. Backend removes the model from default operational read models and deletes or tombstones the native XGBoost artifact according to artifact-storage capabilities.
+6. Backend writes an append-only `MODEL_DELETED` audit event with model/run/strategy identifiers, previous status, artifact path, operator, timestamp, and deletion outcome.
+7. Frontend returns the operator to the strategy detail/list context and refreshes model summaries.
 
 ### Compatibility and Traceability
 
@@ -322,7 +339,7 @@ Future trading execution must treat approved models as inputs and must not reint
 
 - **Frontend -> Backend/API**
   - JSON HTTP contracts.
-  - Commands: start training, approve model, reject model.
+  - Commands: start training, approve model, reject model, delete rejected model.
   - Queries: list strategies, get strategy detail, list trained models, get model scorecard, get audit events/log summaries.
 
 - **Backend/API -> MySQL**
@@ -367,8 +384,14 @@ Future trading execution must treat approved models as inputs and must not reint
 - `POST /api/models/{model_id}/reject`
   - Rejects a post-training model with comments.
 
+- `DELETE /api/models/{model_id}`
+  - Deletes only a model currently in `REJECTED` status.
+  - Request requires operator identity and may include deletion reason/comment.
+  - Returns success only after the backend has updated operational visibility, handled the artifact cleanup/tombstone, and written the audit event.
+  - Returns conflict if the model is not `REJECTED`.
+
 - `GET /api/audit-events`
-  - Returns chronological audit events for system lifecycle actions, including training starts, completions, failures, validation transitions, and approval/rejection decisions with timestamps.
+  - Returns chronological audit events for system lifecycle actions, including training starts, completions, failures, validation transitions, approval/rejection decisions, and rejected-model deletions with timestamps.
 
 Final endpoint names may be refined during implementation, but the backend-mediated boundary is fixed.
 
@@ -420,6 +443,7 @@ Secrets must not be committed, logged, or exposed to the frontend.
 - **Reproducibility:** fixed XGBoost seed and persisted configuration/feature metadata.
 - **Portability:** native XGBoost `.json` or `.ubj` artifact format.
 - **Observability:** audit events, lifecycle statuses, logs, scorecards, and failure reasons.
+- **Auditability of deletion:** deleting a rejected model removes it from operational views but must leave append-only evidence of the deletion event.
 - **Security:** no direct frontend access to MySQL, artifact files, logs, secrets, or external API keys.
 - **Reliability:** failed training/validation leaves explicit `FAILED` state and blocks approval.
 - **Maintainability:** strategy catalog allows additional strategies without replacing the training lifecycle model.
@@ -518,6 +542,14 @@ Latency is not a primary MVP quality attribute because no live inference or exec
 - **Consequences:** better MVP performance and simpler security posture; deeper feature audit can remain backend/internal or future work.
 - **PRD traceability:** PRD sections 7 RF3/RF7, 10, 11 CA7.
 
+### AD12 - Rejected-Model Deletion Is Backend-Mediated and Audited
+
+- **Context:** Agentic Architect request on 2026-06-16 adds an operator need to delete models after they are rejected.
+- **Options considered:** allow physical deletion of any model, soft-delete only, rejected-only audited cleanup.
+- **Chosen approach:** rejected-only audited cleanup through backend/API. The model disappears from normal operational lists, and the artifact is deleted or tombstoned by backend-owned storage logic. The audit event remains append-only.
+- **Consequences:** operators can clean up bad/rejected model clutter while approved/validated/training lifecycle safety remains intact. Full historical comparison for a deleted rejected model may no longer be available outside audit/tombstone metadata.
+- **PRD traceability:** supersedes the previous RF9 assumption that all rejected-model metrics are always preserved for comparison when the operator explicitly deletes a rejected model.
+
 ## 13. Risks and Mitigations
 
 - **Data leakage risk**
@@ -544,6 +576,9 @@ Latency is not a primary MVP quality attribute because no live inference or exec
 - **Credential leakage risk**
   - Mitigation: environment/config files outside version control, backend-only access, no frontend exposure.
 
+- **Accidental deletion of usable model**
+  - Mitigation: backend rejects deletion unless status is exactly `REJECTED`; frontend hides delete action for every other state; audit event is mandatory.
+
 ## 14. Future Work and Explicit Deferrals
 
 Deferred from this MVP:
@@ -567,6 +602,7 @@ Deferred from this MVP:
 ## 15. Sources
 
 - `project-context/1.define/prd.md`
+- Agentic Architect request in chat on 2026-06-16: allow deleting a model that has been rejected.
 - `project-context/1.define/revisao.md`
 - `project-context/1.define/review.md`
 - `.codex/aamad/agents/system-arch.md`
@@ -582,6 +618,7 @@ Deferred from this MVP:
 - No private exchange credentials are needed for this MVP.
 - The frontend has no authentication for MVP unless the Agentic Architect later changes scope.
 - Approval comments are optional; rejection comments are mandatory.
+- A rejected model may be explicitly deleted by the operator; this cleanup removes it from operational model lists while preserving an append-only audit event.
 - Default values for `N`, `X`, `Y`, and data windows are deployment configuration defaults, documented in `.env.example`, and may be changed per volatility regime.
 - The frontend exposes feature schema metadata and scorecards, not raw transformed feature samples.
 
@@ -606,3 +643,4 @@ Implementation defaults still to be set during build planning:
 - Database versioning: Alembic
 - Source inputs: `project-context/1.define/prd.md`, `project-context/1.define/revisao.md`, `project-context/1.define/review.md`, `.codex/aamad/templates/sad-template.md`, `.codex/aamad/agents/system-arch.md`
 - Review status: approved by the Agentic Architect on 2026-06-15
+- Update: rejected-model deletion requirement added from Agentic Architect request on 2026-06-16; approved by the Agentic Architect on 2026-06-16.

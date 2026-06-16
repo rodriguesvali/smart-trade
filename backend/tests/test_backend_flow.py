@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 os.environ["SMART_TRADE_DATA_MODE"] = "synthetic"
 os.environ["SMART_TRADE_DATABASE_URL"] = "sqlite:///./var/test_smart_trade.db"
@@ -59,10 +60,51 @@ def test_training_and_validation_flow() -> None:
         validated_model = validation_response.json()
         assert validated_model["status"] == "VALIDATED"
         assert validated_model["validation_summary"]["ml_metrics"]["row_count"] > 0
+        artifact_path = Path(validated_model["artifact_path"])
+        dataset_path = artifact_path.with_suffix(".dataset.npz")
+        assert artifact_path.exists()
+        assert dataset_path.exists()
+
+        delete_validated = client.request(
+            "DELETE",
+            f"/api/models/{model_id}",
+            json={"operator": "test-user", "confirmed": True, "comments": "cleanup attempt"},
+        )
+        assert delete_validated.status_code == 409
+
+        rejection_response = client.post(
+            f"/api/models/{model_id}/reject",
+            json={"operator": "test-user", "comments": "Rejected by backend flow test"},
+        )
+        assert rejection_response.status_code == 200
+        assert rejection_response.json()["status"] == "REJECTED"
+
+        delete_response = client.request(
+            "DELETE",
+            f"/api/models/{model_id}",
+            json={"operator": "test-user", "confirmed": True, "comments": "Remove rejected model"},
+        )
+        assert delete_response.status_code == 200
+        deleted_model = delete_response.json()
+        assert deleted_model["model_id"] == model_id
+        assert deleted_model["previous_status"] == "REJECTED"
+        assert deleted_model["status"] == "DELETED_FROM_OPERATIONAL_VIEWS"
+        assert deleted_model["artifact_cleanup"]["artifact_deleted"] is True
+        assert deleted_model["artifact_cleanup"]["dataset_deleted"] is True
+        assert not artifact_path.exists()
+        assert not dataset_path.exists()
+
+        missing_model = client.get(f"/api/models/{model_id}")
+        assert missing_model.status_code == 404
+
+        strategy_models = client.get(f"/api/strategies/{strategy_id}/models")
+        assert strategy_models.status_code == 200
+        assert model_id not in {model["id"] for model in strategy_models.json()}
 
         events = client.get("/api/audit-events")
         assert events.status_code == 200
         assert len(events.json()) >= 3
+        assert any(event["event_type"] == "MODEL_DELETED" for event in events.json())
 
 
 def test_training_rejects_whole_number_percentages() -> None:
