@@ -4,9 +4,16 @@
     {
       "label": "Backend: start",
       "type": "shell",
-      "command": "uv run --group training --group exchange uvicorn smart_trade_backend.main:app --host 0.0.0.0 --port 8000 --reload",
+      "command": "/usr/local/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload",
       "options": {
-        "cwd": "${workspaceFolder}/backend"
+        "cwd": "${workspaceFolder}/backend",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/backend",
+          "SMART_TRADE_ENVIRONMENT": "development",
+          "SMART_TRADE_DATABASE_URL": "sqlite:///./var/smart_trade.db",
+          "SMART_TRADE_ARTIFACT_DIR": "./var/models",
+          "GLOBAL_RANDOM_SEED": "42"
+        }
       },
       "isBackground": true,
       "problemMatcher": {
@@ -23,28 +30,18 @@
       }
     },
     {
-      "label": "Frontend: start",
-      "type": "npm",
-      "script": "start",
-      "path": "frontend",
-      "isBackground": true,
-      "problemMatcher": {
-        "owner": "typescript",
-        "pattern": "$tsc",
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": "Changes detected|Application bundle generation",
-          "endsPattern": "bundle generation (complete|failed)|Local:"
+      "label": "Backend: test",
+      "type": "shell",
+      "command": "/usr/local/bin/python -m pytest -q tests",
+      "options": {
+        "cwd": "${workspaceFolder}/backend",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/backend",
+          "SMART_TRADE_DATABASE_URL": "sqlite:///./var/test_smart_trade.db",
+          "SMART_TRADE_ARTIFACT_DIR": "./var/test-models",
+          "GLOBAL_RANDOM_SEED": "42"
         }
-      }
-    },
-    {
-      "label": "Full Stack: start",
-      "dependsOrder": "parallel",
-      "dependsOn": [
-        "Backend: start",
-        "Frontend: start"
-      ],
+      },
       "problemMatcher": []
     }
   ]

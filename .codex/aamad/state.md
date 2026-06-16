@@ -5,11 +5,16 @@ Repository: `/workspaces/smart-trade`
 
 ## Current Stage
 
-Define phase in progress for the reset MVP scope.
+Build phase started for the reset MVP scope, focused on backend Swagger/API capability.
 
 ## Approved Artifacts
 
 - `project-context/1.define/prd.md` - MVP Pipeline de Treinamento PRD, approved by the Agentic Architect on 2026-06-15.
+- `project-context/1.define/sad.md` - MVP Pipeline de Treinamento SAD, approved by the Agentic Architect on 2026-06-15.
+
+## Pending Artifacts
+
+- `project-context/2.build/backend.md` - Backend Build B1, implemented and pending Agentic Architect review.
 
 ## Current MVP Scope
 
@@ -23,4 +28,4 @@ Define phase in progress for the reset MVP scope.
 
 ## Review Gate
 
-PRD review gate is approved. Next AAMAD step should not begin until explicitly requested by the Agentic Architect.
+PRD and SAD review gates are approved. Backend Build B1 is pending review. Do not advance to another build slice until explicitly requested by the Agentic Architect.

@@ -2,6 +2,7 @@
 .venv/
 node_modules/
 __pycache__/
+*.egg-info/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
@@ -11,3 +12,4 @@ __pycache__/
 !.devcontainer/devcontainer.env.example
 !.devcontainer/devcontainer.env
 var/
+backend/var/

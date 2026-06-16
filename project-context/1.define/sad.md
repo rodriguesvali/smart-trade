@@ -23,7 +23,7 @@ Core principles:
 - **Frontend engineer:** needs read/write API contracts and UI state expectations for `XGBoost Strategies`.
 - **QA engineer:** needs acceptance-testable state transitions, data-leakage safeguards, and audit evidence.
 - **System architect:** needs the MVP to remain small while preserving future multi-strategy extensibility.
-- **External data providers:** Bybit and possible consolidated sentiment APIs such as Coinglass, Binance, or Bybit public endpoints are integration boundaries.
+- **External data providers:** CCXT is the primary market-data integration boundary for training data; configured exchanges behind CCXT and explicitly approved sentiment providers are external integration boundaries.
 
 Primary concerns:
 
@@ -108,7 +108,7 @@ Training Orchestrator
 - **Python Backend/API:** owns all frontend contracts, command validation, read models, status projection, and audit event creation.
 - **Training Orchestrator:** coordinates training run lifecycle from `PENDING` to `RUNNING` to `TRAINED` or `FAILED`.
 - **Strategy Catalog:** exposes registered strategy metadata and default parameters. MVP contains `RSI Sentiment XGBoost M1`.
-- **Market/Sentiment Data Ingestion:** loads M1 spot price data and sentiment proxies for Open Interest, Long/Short Ratio, and CVD from configured public sources.
+- **Market/Sentiment Data Ingestion:** loads configured-timeframe spot price data through CCXT and sentiment proxies for Open Interest, Long/Short Ratio, and CVD from configured public sources.
 - **Feature Engineering:** computes RSI/IFR and transforms sentiment features with stationarity and lag rules.
 - **XGBoost Trainer:** trains a binary classifier using chronological partitions and early stopping.
 - **Validation Pipeline:** automatically runs walk-forward validation and holdout backtest after successful training.
@@ -187,7 +187,7 @@ Shared: log/event storage
 
 - `training_strategies`
   - Strategy catalog metadata.
-  - Includes stable strategy ID, name, version, description, model family, timeframe, feature contract, default parameters, and enabled status.
+  - Includes stable strategy ID, name, version, description, model family, feature contract, default parameters, and enabled status. Timeframe belongs to default/training parameters, not strategy identity.
 
 - `training_runs`
   - One row per training execution.
@@ -248,7 +248,7 @@ TRAINED -> REJECTED
 
 1. Backend validates command and creates `training_runs` with `PENDING`.
 2. Training worker claims the run and sets `RUNNING`.
-3. Data loader reads configured M1 spot and sentiment data sources.
+3. Data loader reads configured-timeframe spot and sentiment data sources.
 4. Feature pipeline computes RSI/IFR and sentiment features.
 5. Feature pipeline applies stationarity transformations and lag rules.
 6. Splitter creates chronological train, internal validation, and holdout windows.
@@ -307,12 +307,14 @@ Future trading execution must treat approved models as inputs and must not reint
 
 ### External Integrations
 
-- **Bybit public market data**
-  - Used for M1 spot price/candle data.
+- **CCXT public market data**
+  - Primary training-data integration for configured exchange, symbol, and timeframe.
+  - Used for spot price/candle data through public CCXT methods.
   - No private trading endpoints in MVP.
 
 - **Sentiment data providers**
-  - Candidate sources include Coinglass API, Binance public endpoints, or Bybit public endpoints.
+  - CCXT is preferred when the configured exchange exposes the required public derivative/sentiment metrics through supported methods.
+  - Any non-CCXT sentiment provider must be explicitly approved as a separate adapter before implementation.
   - Used for Open Interest, Long/Short Ratio, and CVD or CVD-like deltas.
   - Source freshness and lag behavior must be recorded or conservatively shifted.
 
@@ -403,7 +405,7 @@ Required configuration categories:
 - Log directory.
 - Default exchange/source settings.
 - Default symbol `BTC/USDT`.
-- Timeframe `M1`.
+- Default timeframe `M1`, configurable per training request.
 - Training/validation/holdout windows.
 - Target parameters `N`, `X`, and `Y`.
 - XGBoost hyperparameters.
@@ -486,7 +488,7 @@ Latency is not a primary MVP quality attribute because no live inference or exec
 
 ### AD8 - Sentiment Lag Safety
 
-- **Context:** M1 sentiment APIs can lag and create unintended look-ahead bias.
+- **Context:** sentiment APIs can lag relative to the configured candle timeframe and create unintended look-ahead bias.
 - **Options considered:** use raw aligned timestamps, apply conservative lag when needed.
 - **Chosen approach:** source-specific lag rule, conservatively shifted when latency risk exists.
 - **Consequences:** reduces leakage risk, may sacrifice some signal recency.
@@ -500,12 +502,12 @@ Latency is not a primary MVP quality attribute because no live inference or exec
 - **Consequences:** simpler deployment; future extraction to a separate worker remains possible if training duration or concurrency requires it.
 - **PRD traceability:** PRD sections 5, 7 RF4-RF6, 10.
 
-### AD10 - Initial Sentiment Source Preference
+### AD10 - Training Data Source Boundary
 
-- **Context:** Open Interest, Long/Short Ratio, and CVD-like data need a default integration path for the first testable implementation.
-- **Options considered:** Coinglass API, Bybit public API, Binance public API.
-- **Chosen approach:** Bybit Public API or Binance Public API for the first integrated test, consuming Open Interest and Long/Short Ratio variation where available. CVD-like data may use provider-supported deltas or remain source-dependent within the approved feature contract.
-- **Consequences:** keeps the MVP near exchange-public data and avoids tick/order-book CVD computation.
+- **Context:** training data must be obtained through a stable exchange abstraction instead of coupling the architecture directly to a single exchange API.
+- **Options considered:** direct Bybit public API, direct Binance public API, Coinglass API, CCXT public market-data adapter.
+- **Chosen approach:** CCXT is the primary integration boundary for configured exchange, symbol, timeframe, OHLCV candles, and any exchange-supported public derivative/sentiment metrics. CVD-like data may use provider-supported deltas or remain source-dependent within the approved feature contract.
+- **Consequences:** keeps the MVP aligned with the Native CCXT product direction and avoids hard-coding Bybit as the architectural data origin. If a required sentiment metric is unavailable through CCXT for the configured exchange, dataset construction must fail explicitly or wait for an approved provider adapter.
 - **PRD traceability:** PRD sections 6, 12 decision 4.
 
 ### AD11 - Frontend Feature Evidence Boundary
@@ -576,7 +578,7 @@ Deferred from this MVP:
 - The reset MVP scope supersedes broader prior build-phase notes for this artifact.
 - The first implementation can run training in a background thread/task inside the backend service process if `RUNNING` and terminal states are written synchronously to MySQL.
 - MySQL and Alembic are required architecture choices for this project even though the current MVP is training-only.
-- Initial sentiment source selection should prefer Bybit Public API or Binance Public API for the first integrated test, while the architecture keeps provider metadata, lag rules, and failure behavior explicit.
+- Training data source selection should prefer CCXT for the configured exchange, symbol, timeframe, candles, and any supported public sentiment metrics, while the architecture keeps provider metadata, lag rules, and failure behavior explicit.
 - No private exchange credentials are needed for this MVP.
 - The frontend has no authentication for MVP unless the Agentic Architect later changes scope.
 - Approval comments are optional; rejection comments are mandatory.
@@ -603,4 +605,4 @@ Implementation defaults still to be set during build planning:
 - Database: MySQL
 - Database versioning: Alembic
 - Source inputs: `project-context/1.define/prd.md`, `project-context/1.define/revisao.md`, `project-context/1.define/review.md`, `.codex/aamad/templates/sad-template.md`, `.codex/aamad/agents/system-arch.md`
-- Review status: pending Agentic Architect review
+- Review status: approved by the Agentic Architect on 2026-06-15

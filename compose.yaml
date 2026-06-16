@@ -6,6 +6,8 @@ services:
       SMART_TRADE_ENVIRONMENT: development
       SMART_TRADE_DATABASE_URL: mysql+pymysql://smart_trade:smart_trade@mysql:3306/smart_trade
       SMART_TRADE_RUN_MIGRATIONS_ON_STARTUP: "true"
+      SMART_TRADE_ARTIFACT_DIR: /workspaces/smart-trade/var/models
+      GLOBAL_RANDOM_SEED: "42"
     ports:
       - "8000:8000"
     depends_on:

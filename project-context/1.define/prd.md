@@ -2,7 +2,7 @@
 
 ## 1. Sumário Executivo
 
-Este PRD define o primeiro MVP do Smart Trade: um pipeline de treinamento controlado, auditável e preparado para múltiplas estratégias, embora o MVP entregue apenas uma estratégia de treinamento implementada para mercado crypto spot em timeframe M1.
+Este PRD define o primeiro MVP do Smart Trade: um pipeline de treinamento controlado, auditável e preparado para múltiplas estratégias, embora o MVP entregue apenas uma estratégia de treinamento implementada para mercado crypto spot com timeframe configurável por execução de treinamento.
 
 O objetivo do MVP é permitir que o operador percorra o fluxo mínimo de preparação de uma estratégia baseada em dados históricos, modelo XGBoost e validação temporal. Cada execução de treinamento deve produzir um novo modelo treinado, e esse modelo deve ficar disponível para validação e aprovação antes de qualquer uso operacional futuro.
 
@@ -28,7 +28,7 @@ Esse usuário precisa de uma experiência simples e rastreável: saber quais est
 
 - Catálogo de estratégias preparado para múltiplas estratégias.
 - Uma única estratégia de treinamento implementada e disponível no MVP.
-- Exibição dos metadados da estratégia, incluindo nome, descrição, ativo/timeframe esperado, features requeridas, modelo utilizado e parâmetros principais.
+- Exibição dos metadados da estratégia, incluindo nome, descrição, features requeridas, modelo utilizado e parâmetros principais.
 - Execução manual do treinamento da estratégia.
 - Coleta ou leitura de dados históricos M1 necessários ao treinamento, conforme configuração externa.
 - Engenharia de features técnicas necessárias para a estratégia, garantindo estacionariedade quando aplicável.
@@ -113,7 +113,7 @@ Para o MVP, a estratégia deve expor em seus detalhes:
 - Nome: `RSI Sentiment XGBoost M1`.
 - Identificador lógico estável.
 - Versão.
-- Timeframe: M1.
+- Timeframe default: `M1`, definido em `default_parameters` e alterável por solicitação de treinamento.
 - Mercado alvo: crypto spot, usando dados de sentimento do mercado de derivativos correspondente como proxy quando disponíveis.
 - Indicador técnico: RSI/IFR.
 - Operadores de sentimento: Open Interest, Long/Short Ratio e CVD.
@@ -144,7 +144,7 @@ A tabela deve exibir, no mínimo:
 - Versão.
 - Descrição.
 - Modelo utilizado.
-- Timeframe.
+- Timeframe default nos parâmetros de treinamento.
 - Botão ou ação `Open`.
 
 ### RF3 - Exibir Estratégia de Treinamento
@@ -376,10 +376,10 @@ Dado que o pipeline gera features normalizadas ou agregadas por janela, quando e
 
 As seguintes premissas técnicas ficam definidas para o escopo deste MVP:
 
-1. **Ativo padrão:** o pipeline será configurado via `.env` com a paridade `BTC/USDT`, utilizando dados da Bybit. O preço spot será a referência operacional, e futuros perpétuos poderão ser usados como proxy para métricas de sentimento.
+1. **Ativo padrão:** o pipeline será configurado via `.env` com a paridade `BTC/USDT`, utilizando CCXT como fronteira primária de obtenção de dados da exchange configurada. O preço spot será a referência operacional, e futuros perpétuos poderão ser usados como proxy para métricas de sentimento quando disponíveis pela exchange configurada.
 2. **Automação da validação:** a validação será executada de forma automática após o sucesso do treinamento. Apenas a decisão de aprovação ou rejeição permanece estritamente manual.
 3. **Filtros de aprovação:** para o MVP, não haverá travas automáticas por valor mínimo de métrica, como win rate mínimo. A validação serve para gerar evidências; o julgamento de qualidade do modelo é responsabilidade do operador técnico.
-4. **Origem dos dados de sentimento:** Open Interest, Long/Short Ratio e variações de CVD serão consumidos de APIs consolidadas de mercado, como Coinglass API ou Binance/Bybit Public API, evitando calcular CVD bruto a partir de dados de tick, order book ou trades individuais dentro do MVP.
+4. **Origem dos dados de sentimento:** Open Interest, Long/Short Ratio e variações de CVD serão consumidos preferencialmente via CCXT quando a exchange configurada expuser métricas públicas compatíveis. Qualquer provedor externo não-CCXT deverá ser aprovado como adapter separado, evitando calcular CVD bruto a partir de dados de tick, order book ou trades individuais dentro do MVP.
 5. **Formato do modelo:** o artefato treinado será salvo em formato nativo do XGBoost, `.json` ou `.ubj`, e não em `.pkl` ou `.joblib`.
 6. **Target no MVP:** `X` e `Y` serão configuráveis externamente como percentuais estáticos no MVP, com aviso operacional para revisão em mudanças de regime de volatilidade. Barreiras adaptativas por ATR ou desvio padrão ficam como evolução futura.
 
