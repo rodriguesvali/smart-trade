@@ -4,6 +4,12 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(BACKEND_ROOT / ".env")
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -42,7 +48,7 @@ def get_settings() -> Settings:
         default_target_n=int(os.getenv("SMART_TRADE_TARGET_N", "15")),
         default_take_profit_pct=float(os.getenv("SMART_TRADE_TARGET_TAKE_PROFIT_PCT", "0.0015")),
         default_stop_loss_pct=float(os.getenv("SMART_TRADE_TARGET_STOP_LOSS_PCT", "0.0010")),
-        default_training_rows=int(os.getenv("SMART_TRADE_TRAINING_ROWS", os.getenv("SMART_TRADE_SYNTHETIC_TRAINING_ROWS", "900"))),
+        default_training_rows=int(os.getenv("SMART_TRADE_TRAINING_ROWS", os.getenv("SMART_TRADE_SYNTHETIC_TRAINING_ROWS", "25920"))),
         default_validation_ratio=float(os.getenv("SMART_TRADE_VALIDATION_RATIO", "0.2")),
         default_holdout_ratio=float(os.getenv("SMART_TRADE_HOLDOUT_RATIO", "0.2")),
         default_probability_threshold=float(os.getenv("SMART_TRADE_PROBABILITY_THRESHOLD", "0.55")),

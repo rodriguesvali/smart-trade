@@ -45,7 +45,12 @@ class TrainingRequest(BaseModel):
         lt=1,
         description="Decimal fraction target. Example: 0.01 means 1%, 0.001 means 0.1%.",
     )
-    training_rows: int | None = Field(default=None, ge=180, le=5000)
+    training_rows: int | None = Field(
+        default=None,
+        ge=180,
+        le=100_000,
+        description="Number of usable candles. For 90 days on M5 use 25920.",
+    )
 
 
 class TrainingRunRead(BaseModel):

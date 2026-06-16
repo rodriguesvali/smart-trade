@@ -85,6 +85,7 @@ Checagem executada:
 - Alembic ainda não foi materializado nesta fatia; a persistência usa `create_all` no startup para permitir validação rápida do fluxo backend. A próxima fatia de build deve substituir isso por migrações Alembic versionadas.
 - O modo de produto default é `SMART_TRADE_DATA_MODE=real`, usando `ccxt.fetch_ohlcv` para candles fechados. Para testes automatizados, `SMART_TRADE_DATA_MODE=synthetic` evita dependência de rede.
 - `sentiment_required=true` exige Open Interest, Long/Short Ratio e Taker Buy/Sell Ratio via CCXT. `sentiment_required=false` permite fallback para proxies OHLCV claramente marcados em `feature_schema.dataset.sentiment_status=ohlcv_proxy_features`.
+- O treinamento usa `training_rows` como quantidade de candles úteis. Para 3 meses em `M5`, o valor recomendado é `25920` candles (`90 * 24 * 12`). O Swagger aceita até `100000`.
 
 ## Evidência de Verificação
 
@@ -127,7 +128,7 @@ Payload mínimo real recomendado no Swagger:
   "symbol": "BTC/USDT",
   "sentiment_symbol": "BTC/USDT:USDT",
   "timeframe": "M5",
-  "training_rows": 180,
+  "training_rows": 25920,
   "target_n": 5,
   "take_profit_pct": 0.0002,
   "stop_loss_pct": 0.0002,

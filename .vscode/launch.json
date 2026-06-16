@@ -5,7 +5,7 @@
       "name": "Backend: FastAPI",
       "type": "debugpy",
       "request": "launch",
-      "python": "/usr/local/bin/python",
+      "python": "${workspaceFolder}/backend/.venv/bin/python",
       "module": "uvicorn",
       "args": [
         "app.main:app",
@@ -16,12 +16,10 @@
         "--reload"
       ],
       "cwd": "${workspaceFolder}/backend",
+      "envFile": "${workspaceFolder}/backend/.env",
       "env": {
         "PYTHONPATH": "${workspaceFolder}/backend",
-        "SMART_TRADE_ENVIRONMENT": "development",
-        "SMART_TRADE_DATABASE_URL": "sqlite:///./var/smart_trade.db",
-        "SMART_TRADE_ARTIFACT_DIR": "./var/models",
-        "GLOBAL_RANDOM_SEED": "42"
+        "SMART_TRADE_ENVIRONMENT": "development"
       },
       "justMyCode": true
     },
@@ -29,20 +27,21 @@
       "name": "Backend: FastAPI (terminal)",
       "type": "node-terminal",
       "request": "launch",
-      "command": "/usr/local/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload",
+      "command": ".venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload",
       "cwd": "${workspaceFolder}/backend"
     },
     {
       "name": "Backend: Tests",
       "type": "debugpy",
       "request": "launch",
-      "python": "/usr/local/bin/python",
+      "python": "${workspaceFolder}/backend/.venv/bin/python",
       "module": "pytest",
       "args": [
         "-q",
         "tests"
       ],
       "cwd": "${workspaceFolder}/backend",
+      "envFile": "${workspaceFolder}/backend/.env",
       "env": {
         "PYTHONPATH": "${workspaceFolder}/backend",
         "SMART_TRADE_DATABASE_URL": "sqlite:///./var/test_smart_trade.db",

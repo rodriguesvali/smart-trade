@@ -6,6 +6,7 @@ os.environ["SMART_TRADE_DATA_MODE"] = "synthetic"
 
 from fastapi.testclient import TestClient
 
+from app.adapters.api.schemas import TrainingRequest
 from app.main import app
 
 
@@ -65,3 +66,9 @@ def test_training_rejects_whole_number_percentages() -> None:
 
         assert response.status_code == 422
         assert "Input should be less than 1" in response.text
+
+
+def test_training_request_accepts_three_month_m5_window() -> None:
+    request = TrainingRequest(training_rows=25_920)
+
+    assert request.training_rows == 25_920
