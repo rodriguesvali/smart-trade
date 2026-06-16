@@ -8,7 +8,7 @@
       "python": "${workspaceFolder}/backend/.venv/bin/python",
       "module": "uvicorn",
       "args": [
-        "app.main:app",
+        "smart_trade_api.main:app",
         "--host",
         "0.0.0.0",
         "--port",
@@ -27,7 +27,7 @@
       "name": "Backend: FastAPI (terminal)",
       "type": "node-terminal",
       "request": "launch",
-      "command": ".venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload",
+      "command": ".venv/bin/python -m uvicorn smart_trade_api.main:app --host 0.0.0.0 --port 8000 --reload",
       "cwd": "${workspaceFolder}/backend"
     },
     {
@@ -35,7 +35,7 @@
       "type": "debugpy",
       "request": "launch",
       "python": "${workspaceFolder}/backend/.venv/bin/python",
-      "module": "app.workers.training_worker",
+      "module": "smart_trade_training_worker.main",
       "cwd": "${workspaceFolder}/backend",
       "envFile": "${workspaceFolder}/backend/.env",
       "env": {
@@ -48,7 +48,7 @@
       "name": "Backend: Training Worker (terminal)",
       "type": "node-terminal",
       "request": "launch",
-      "command": ".venv/bin/python -m app.workers.training_worker",
+      "command": ".venv/bin/python -m smart_trade_training_worker.main",
       "cwd": "${workspaceFolder}/backend"
     },
     {

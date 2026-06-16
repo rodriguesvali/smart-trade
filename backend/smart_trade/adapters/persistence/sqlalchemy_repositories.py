@@ -5,9 +5,9 @@ from datetime import datetime
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from app.domain.entities import ApprovalRecord, AuditEvent, TrainedModel, TrainingRun, TrainingStrategy, ValidationResult
-from app.domain.enums import ApprovalDecision, StrategyStatus, TrainedModelStatus, TrainingRunStatus
-from app.adapters.persistence.models import (
+from smart_trade.domain.entities import ApprovalRecord, AuditEvent, TrainedModel, TrainingRun, TrainingStrategy, ValidationResult
+from smart_trade.domain.enums import ApprovalDecision, StrategyStatus, TrainedModelStatus, TrainingRunStatus
+from smart_trade.adapters.persistence.models import (
     AuditEventRecord,
     TrainedModelRecord,
     TrainingApprovalDecisionRecord,

@@ -5,9 +5,9 @@ from time import sleep
 
 import ccxt
 
-from app.adapters.market_data.ccxt_market_data_provider import TIMEFRAME_MS, to_ccxt_timeframe
-from app.application.ports.sentiment import SentimentPoint, SentimentSeries
-from app.domain.exceptions import ValidationError
+from smart_trade.adapters.market_data.ccxt_market_data_provider import TIMEFRAME_MS, to_ccxt_timeframe
+from smart_trade.application.ports.sentiment import SentimentPoint, SentimentSeries
+from smart_trade.domain.exceptions import ValidationError
 
 
 MAX_PAGE_LIMIT = 500

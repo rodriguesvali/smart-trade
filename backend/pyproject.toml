@@ -23,7 +23,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["app*"]
+include = ["smart_trade*", "smart_trade_api*", "smart_trade_training_worker*"]
 exclude = ["var*"]
 
 [tool.pytest.ini_options]

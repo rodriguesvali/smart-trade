@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from app.domain.enums import ApprovalDecision, StrategyStatus, TrainedModelStatus, TrainingRunStatus
-from app.domain.exceptions import InvalidStateTransitionError, ValidationError
+from smart_trade.domain.enums import ApprovalDecision, StrategyStatus, TrainedModelStatus, TrainingRunStatus
+from smart_trade.domain.exceptions import InvalidStateTransitionError, ValidationError
 
 
 @dataclass(frozen=True)

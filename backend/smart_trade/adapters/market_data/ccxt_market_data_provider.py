@@ -5,8 +5,8 @@ from time import sleep
 
 import ccxt
 
-from app.application.ports.market_data import MarketCandle
-from app.domain.exceptions import ValidationError
+from smart_trade.application.ports.market_data import MarketCandle
+from smart_trade.domain.exceptions import ValidationError
 
 
 TIMEFRAME_ALIASES = {

@@ -9,9 +9,9 @@ import pandas as pd
 from sklearn.metrics import confusion_matrix, f1_score, log_loss, precision_score
 from xgboost import XGBClassifier
 
-from app.application.ports.market_data import MarketCandle
-from app.application.ports.sentiment import SentimentSeries
-from app.domain.exceptions import ValidationError
+from smart_trade.application.ports.market_data import MarketCandle
+from smart_trade.application.ports.sentiment import SentimentSeries
+from smart_trade.domain.exceptions import ValidationError
 
 
 FEATURE_NAMES = ["rsi_14", "open_interest_roc", "long_short_ratio", "taker_buy_sell_ratio"]

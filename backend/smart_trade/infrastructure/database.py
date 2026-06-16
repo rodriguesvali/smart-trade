@@ -6,7 +6,7 @@ from pathlib import Path
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from app.infrastructure.config import get_settings
+from smart_trade.infrastructure.config import get_settings
 
 
 class Base(DeclarativeBase):
@@ -28,7 +28,7 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 
 
 def init_database() -> None:
-    import app.adapters.persistence.models  # noqa: F401
+    import smart_trade.adapters.persistence.models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
     _apply_compatibility_migrations()

@@ -2,7 +2,7 @@
 
 ## Status
 
-Build backend em andamento para o MVP resetado do pipeline de treinamento. A fatia atual remodela o treinamento para execução assíncrona por worker separado, mantendo candles reais via CCXT e o dataset sintético apenas como modo explícito de desenvolvimento/teste.
+Build backend em andamento para o MVP resetado do pipeline de treinamento. A fatia atual separa os entrypoints de API e worker em processos Python distintos sobre um pacote backend compartilhado, mantendo treinamento assíncrono, candles reais via CCXT e dataset sintético apenas como modo explícito de desenvolvimento/teste.
 
 ## Escopo Implementado
 
@@ -11,7 +11,8 @@ Build backend em andamento para o MVP resetado do pipeline de treinamento. A fat
 - Endpoint para listar estratégias.
 - Endpoint para abrir detalhes da estratégia.
 - Endpoint para solicitar treinamento, retornando `202 Accepted` com execução `PENDING`.
-- Worker assíncrono `app.workers.training_worker` para reivindicar execuções pendentes e treinar fora do ciclo HTTP.
+- Worker assíncrono `smart_trade_training_worker.main` para reivindicar execuções pendentes e treinar fora do ciclo HTTP.
+- Entrypoint HTTP separado em `smart_trade_api.main`, sem hospedar o loop do worker.
 - Acompanhamento da execução por `progress_phase`, `progress_pct`, `progress_message`, `worker_id`, `locked_at` e `heartbeat_at`.
 - `timeframe` tratado como parâmetro de treinamento, com default `M5`, e não como metadado fixo da estratégia.
 - `exchange_id`, `data_mode` e `sentiment_required` tratados como parâmetros/configuração de treinamento.
@@ -32,37 +33,39 @@ Build backend em andamento para o MVP resetado do pipeline de treinamento. A fat
 
 ## Arquitetura Hexagonal + DDD
 
-Após revisão arquitetural, o backend foi reorganizado para separar domínio, aplicação, adapters e infraestrutura:
+Após revisão arquitetural, o backend foi reorganizado para separar domínio, aplicação, adapters, infraestrutura e entrypoints executáveis:
 
-- `backend/app/domain/`
+- `backend/smart_trade/domain/`
   - Entidades e regras de negócio independentes de framework.
   - Enums de status para estratégias, execuções, modelos e decisões.
   - Políticas de transição: aprovação apenas de modelo `VALIDATED`, rejeição com comentário obrigatório, finalização imutável de modelos aprovados/rejeitados.
-- `backend/app/application/ports/`
+- `backend/smart_trade/application/ports/`
   - Portas para repositórios, trainer, validator, market data, relógio e geração de IDs.
-- `backend/app/application/use_cases/`
+- `backend/smart_trade/application/use_cases/`
   - Casos de uso de treinamento, validação, consulta, aprovação e rejeição.
   - Não importa FastAPI, SQLAlchemy, XGBoost, sklearn, numpy nem filesystem.
-- `backend/app/adapters/api/`
+- `backend/smart_trade/adapters/api/`
   - Adapter de entrada FastAPI/Swagger.
   - Faz mapeamento HTTP/DTO e converte exceções de domínio em respostas HTTP.
-- `backend/app/adapters/persistence/`
+- `backend/smart_trade/adapters/persistence/`
   - Adapter SQLAlchemy.
   - Converte records ORM para entidades de domínio e vice-versa.
-- `backend/app/adapters/ml/`
+- `backend/smart_trade/adapters/ml/`
   - Adapters XGBoost para dataset real e dataset sintético de desenvolvimento.
   - Implementa as portas `ModelTrainer` e `ModelValidator`.
-- `backend/app/adapters/market_data/`
+- `backend/smart_trade/adapters/market_data/`
   - Adapter público CCXT para candles OHLCV.
-- `backend/app/infrastructure/`
+- `backend/smart_trade/infrastructure/`
   - Configuração, sessão de banco, composição de dependências, relógio e UUID.
-- `backend/app/workers/`
-  - Processo de background que usa os mesmos casos de uso de aplicação.
+- `backend/smart_trade_api/`
+  - Entrypoint FastAPI/Uvicorn para Swagger e contratos HTTP.
+- `backend/smart_trade_training_worker/`
+  - Entrypoint de background que usa os mesmos casos de uso de aplicação.
   - Reivindica uma execução `PENDING` por vez no repositório e mantém concorrência efetiva em 1 worker local.
 
 Checagem executada:
 
-- `rg -n "fastapi|sqlalchemy|ccxt|pandas|xgboost|sklearn|numpy|Path\\(" backend/app/domain backend/app/application`: sem ocorrências.
+- `rg -n "fastapi|sqlalchemy|ccxt|pandas|xgboost|sklearn|numpy|Path\\(" backend/smart_trade/domain backend/smart_trade/application`: sem ocorrências.
 
 ## Documentação Consultada
 
@@ -102,7 +105,7 @@ Checagem executada:
 ## Evidência de Verificação
 
 - `cd backend && .venv/bin/python -m pytest -q tests`: 8 passed.
-- Checagem arquitetural: `rg -n "fastapi|sqlalchemy|ccxt|pandas|xgboost|sklearn|numpy|Path\\(" backend/app/domain backend/app/application` sem ocorrências.
+- Checagem arquitetural: `rg -n "fastapi|sqlalchemy|ccxt|pandas|xgboost|sklearn|numpy|Path\\(" backend/smart_trade/domain backend/smart_trade/application` sem ocorrências.
 - Validação JSON: `.vscode/launch.json` e `.vscode/tasks.json` válidos via `python -m json.tool`.
 - Smoke interno do builder real: dataset real em memória produziu `(252, 4)` features com metadados `mode=real`.
 - Smoke CCXT público: `binance BTC/USDT M5` retornou candles fechados.
@@ -124,14 +127,14 @@ Para iniciar o servidor local:
 
 - `cd backend`
 - `source .venv/bin/activate`
-- `uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload`
+- `uvicorn smart_trade_api.main:app --host 0.0.0.0 --port 8000 --reload`
 - Swagger: `http://127.0.0.1:8000/docs`
 
 Para iniciar o worker de treinamento em outro terminal:
 
 - `cd backend`
 - `source .venv/bin/activate`
-- `python -m app.workers.training_worker`
+- `python -m smart_trade_training_worker.main`
 
 No VS Code, use o compound `Backend: API + Worker` para subir API e worker juntos.
 

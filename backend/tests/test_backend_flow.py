@@ -8,9 +8,9 @@ os.environ["SMART_TRADE_ARTIFACT_DIR"] = "./var/test-models"
 
 from fastapi.testclient import TestClient
 
-from app.adapters.api.schemas import TrainingRequest
-from app.main import app
-from app.workers.training_worker import run_once
+from smart_trade.adapters.api.schemas import TrainingRequest
+from smart_trade_api.main import app
+from smart_trade_training_worker.main import run_once
 
 
 def test_training_and_validation_flow() -> None:

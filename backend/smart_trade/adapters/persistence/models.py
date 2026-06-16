@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.infrastructure.database import Base
+from smart_trade.infrastructure.database import Base
 
 
 def utcnow() -> datetime:

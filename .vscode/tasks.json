@@ -4,7 +4,7 @@
     {
       "label": "Backend: start",
       "type": "shell",
-      "command": "/usr/local/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload",
+      "command": ".venv/bin/python -m uvicorn smart_trade_api.main:app --host 0.0.0.0 --port 8000 --reload",
       "options": {
         "cwd": "${workspaceFolder}/backend",
         "env": {
@@ -32,7 +32,7 @@
     {
       "label": "Backend: worker",
       "type": "shell",
-      "command": ".venv/bin/python -m app.workers.training_worker",
+      "command": ".venv/bin/python -m smart_trade_training_worker.main",
       "options": {
         "cwd": "${workspaceFolder}/backend",
         "env": {
@@ -46,7 +46,7 @@
     {
       "label": "Backend: test",
       "type": "shell",
-      "command": "/usr/local/bin/python -m pytest -q tests",
+      "command": ".venv/bin/python -m pytest -q tests",
       "options": {
         "cwd": "${workspaceFolder}/backend",
         "env": {

@@ -3,12 +3,12 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.application.use_cases.training import DecisionCommand, TrainingCommand, TrainingUseCases
-from app.domain.entities import AuditEvent, TrainedModel, TrainingRun, TrainingStrategy, ValidationResult
-from app.domain.exceptions import DomainError, InvalidStateTransitionError, NotFoundError, ValidationError
-from app.infrastructure.container import build_training_use_cases
-from app.infrastructure.database import get_session
-from app.adapters.api.schemas import (
+from smart_trade.application.use_cases.training import DecisionCommand, TrainingCommand, TrainingUseCases
+from smart_trade.domain.entities import AuditEvent, TrainedModel, TrainingRun, TrainingStrategy, ValidationResult
+from smart_trade.domain.exceptions import DomainError, InvalidStateTransitionError, NotFoundError, ValidationError
+from smart_trade.infrastructure.container import build_training_use_cases
+from smart_trade.infrastructure.database import get_session
+from smart_trade.adapters.api.schemas import (
     ApprovalRequest,
     AuditEventRead,
     StrategyDetail,

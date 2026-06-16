@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from app.adapters.api.routes import router
-from app.adapters.persistence.sqlalchemy_repositories import SqlAlchemyStrategyRepository
-from app.infrastructure.database import init_database
-from app.strategy_catalog import seed_strategy_catalog
-from app.infrastructure.database import SessionLocal
+from smart_trade.adapters.api.routes import router
+from smart_trade.adapters.persistence.sqlalchemy_repositories import SqlAlchemyStrategyRepository
+from smart_trade.infrastructure.database import init_database
+from smart_trade.strategy_catalog import seed_strategy_catalog
+from smart_trade.infrastructure.database import SessionLocal
 
 
 app = FastAPI(

@@ -4,10 +4,10 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from app.adapters.ml.pipeline import build_dataset_from_candles
-from app.application.ports.market_data import MarketCandle
-from app.application.ports.sentiment import SentimentPoint, SentimentSeries
-from app.domain.exceptions import ValidationError
+from smart_trade.adapters.ml.pipeline import build_dataset_from_candles
+from smart_trade.application.ports.market_data import MarketCandle
+from smart_trade.application.ports.sentiment import SentimentPoint, SentimentSeries
+from smart_trade.domain.exceptions import ValidationError
 
 
 def test_real_dataset_builder_uses_requested_training_rows() -> None:

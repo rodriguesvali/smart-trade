@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from app.application.ports.repositories import StrategyRepository
-from app.domain.entities import TrainingStrategy
-from app.domain.enums import StrategyStatus
-from app.infrastructure.config import get_settings
+from smart_trade.application.ports.repositories import StrategyRepository
+from smart_trade.domain.entities import TrainingStrategy
+from smart_trade.domain.enums import StrategyStatus
+from smart_trade.infrastructure.config import get_settings
 
 
 STRATEGY_ID = "rsi_sentiment_xgboost_m1"

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from app.adapters.market_data.ccxt_market_data_provider import CcxtMarketDataProvider
-from app.adapters.market_data.ccxt_sentiment_data_provider import CcxtSentimentDataProvider
-from app.adapters.ml.xgboost_training_adapter import RealXGBoostTrainingAdapter, SyntheticXGBoostTrainingAdapter
-from app.adapters.persistence.sqlalchemy_repositories import (
+from smart_trade.adapters.market_data.ccxt_market_data_provider import CcxtMarketDataProvider
+from smart_trade.adapters.market_data.ccxt_sentiment_data_provider import CcxtSentimentDataProvider
+from smart_trade.adapters.ml.xgboost_training_adapter import RealXGBoostTrainingAdapter, SyntheticXGBoostTrainingAdapter
+from smart_trade.adapters.persistence.sqlalchemy_repositories import (
     SqlAlchemyApprovalDecisionRepository,
     SqlAlchemyAuditEventRepository,
     SqlAlchemyStrategyRepository,
@@ -13,9 +13,9 @@ from app.adapters.persistence.sqlalchemy_repositories import (
     SqlAlchemyTrainingRunRepository,
     SqlAlchemyValidationResultRepository,
 )
-from app.application.use_cases.training import TrainingUseCases
-from app.infrastructure.clock import SystemClock, UuidGenerator
-from app.infrastructure.config import get_settings
+from smart_trade.application.use_cases.training import TrainingUseCases
+from smart_trade.infrastructure.clock import SystemClock, UuidGenerator
+from smart_trade.infrastructure.config import get_settings
 
 
 def build_training_use_cases(session: Session) -> TrainingUseCases:

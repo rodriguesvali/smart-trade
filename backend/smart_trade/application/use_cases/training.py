@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.application.ports.clock import Clock, IdGenerator
-from app.application.ports.ml import ModelTrainer, ModelValidator
-from app.application.ports.repositories import (
+from smart_trade.application.ports.clock import Clock, IdGenerator
+from smart_trade.application.ports.ml import ModelTrainer, ModelValidator
+from smart_trade.application.ports.repositories import (
     ApprovalDecisionRepository,
     AuditEventRepository,
     StrategyRepository,
@@ -12,9 +12,9 @@ from app.application.ports.repositories import (
     TrainingRunRepository,
     ValidationResultRepository,
 )
-from app.domain.entities import ApprovalRecord, AuditEvent, TrainedModel, TrainingRun, ValidationResult
-from app.domain.enums import ApprovalDecision, TrainedModelStatus, TrainingRunStatus
-from app.domain.exceptions import NotFoundError, ValidationError
+from smart_trade.domain.entities import ApprovalRecord, AuditEvent, TrainedModel, TrainingRun, ValidationResult
+from smart_trade.domain.enums import ApprovalDecision, TrainedModelStatus, TrainingRunStatus
+from smart_trade.domain.exceptions import NotFoundError, ValidationError
 
 
 @dataclass(frozen=True)

@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from app.adapters.market_data.ccxt_sentiment_data_provider import (
+from smart_trade.adapters.market_data.ccxt_sentiment_data_provider import (
     BINANCE_SENTIMENT_RETENTION_MS,
     _ensure_supported_sentiment_window,
     _fetch_paginated,
 )
-from app.domain.exceptions import ValidationError
+from smart_trade.domain.exceptions import ValidationError
 
 
 def test_fetch_paginated_walks_forward_with_valid_windows() -> None:

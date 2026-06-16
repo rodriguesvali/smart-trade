@@ -3,10 +3,10 @@ from __future__ import annotations
 from datetime import timedelta
 from pathlib import Path
 
-from app.application.ports.market_data import MarketDataProvider
-from app.application.ports.ml import TrainingOutput, ValidationOutput
-from app.application.ports.sentiment import SentimentDataProvider
-from app.adapters.ml.pipeline import (
+from smart_trade.application.ports.market_data import MarketDataProvider
+from smart_trade.application.ports.ml import TrainingOutput, ValidationOutput
+from smart_trade.application.ports.sentiment import SentimentDataProvider
+from smart_trade.adapters.ml.pipeline import (
     build_dataset_from_candles,
     generate_dataset,
     load_dataset,
@@ -14,7 +14,7 @@ from app.adapters.ml.pipeline import (
     train_xgboost,
     validate_model,
 )
-from app.domain.exceptions import ValidationError
+from smart_trade.domain.exceptions import ValidationError
 
 
 class SyntheticXGBoostTrainingAdapter:
