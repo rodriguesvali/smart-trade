@@ -11,8 +11,11 @@ class Settings:
     database_url: str
     artifact_dir: Path
     global_random_seed: int
+    data_mode: str
+    default_exchange_id: str
     default_symbol: str
     default_timeframe: str
+    sentiment_required: bool
     default_target_n: int
     default_take_profit_pct: float
     default_stop_loss_pct: float
@@ -31,14 +34,23 @@ def get_settings() -> Settings:
         ),
         artifact_dir=Path(os.getenv("SMART_TRADE_ARTIFACT_DIR", "./var/models")),
         global_random_seed=int(os.getenv("GLOBAL_RANDOM_SEED", "42")),
+        data_mode=os.getenv("SMART_TRADE_DATA_MODE", "real").lower(),
+        default_exchange_id=os.getenv("SMART_TRADE_EXCHANGE_ID", "binance"),
         default_symbol=os.getenv("SMART_TRADE_DEFAULT_SYMBOL", "BTC/USDT"),
         default_timeframe=os.getenv("SMART_TRADE_DEFAULT_TIMEFRAME", "M1"),
+        sentiment_required=_bool_env("SMART_TRADE_SENTIMENT_REQUIRED", False),
         default_target_n=int(os.getenv("SMART_TRADE_TARGET_N", "15")),
         default_take_profit_pct=float(os.getenv("SMART_TRADE_TARGET_TAKE_PROFIT_PCT", "0.0015")),
         default_stop_loss_pct=float(os.getenv("SMART_TRADE_TARGET_STOP_LOSS_PCT", "0.0010")),
-        default_training_rows=int(os.getenv("SMART_TRADE_SYNTHETIC_TRAINING_ROWS", "900")),
+        default_training_rows=int(os.getenv("SMART_TRADE_TRAINING_ROWS", os.getenv("SMART_TRADE_SYNTHETIC_TRAINING_ROWS", "900"))),
         default_validation_ratio=float(os.getenv("SMART_TRADE_VALIDATION_RATIO", "0.2")),
         default_holdout_ratio=float(os.getenv("SMART_TRADE_HOLDOUT_RATIO", "0.2")),
         default_probability_threshold=float(os.getenv("SMART_TRADE_PROBABILITY_THRESHOLD", "0.55")),
     )
 
+
+def _bool_env(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "y", "on"}

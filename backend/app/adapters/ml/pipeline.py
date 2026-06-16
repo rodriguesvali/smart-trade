@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 from sklearn.metrics import confusion_matrix, f1_score, log_loss, precision_score
 from xgboost import XGBClassifier
+
+from app.application.ports.market_data import MarketCandle
+from app.domain.exceptions import ValidationError
 
 
 FEATURE_NAMES = ["rsi_14", "open_interest_roc", "long_short_ratio", "cvd_delta"]
@@ -103,6 +108,113 @@ def generate_dataset(
     return DatasetBundle(features, labels, future_returns, split_indices, metadata)
 
 
+def build_dataset_from_candles(
+    *,
+    candles: list[MarketCandle],
+    exchange_id: str,
+    symbol: str,
+    timeframe: str,
+    training_rows: int,
+    target_n: int,
+    take_profit_pct: float,
+    stop_loss_pct: float,
+    validation_ratio: float,
+    holdout_ratio: float,
+    sentiment_required: bool,
+) -> DatasetBundle:
+    if sentiment_required:
+        raise ValidationError(
+            "Real sentiment data is required, but no CCXT sentiment provider is available for this strategy yet"
+        )
+    minimum_rows = training_rows + target_n
+    if len(candles) < minimum_rows:
+        raise ValidationError(f"At least {minimum_rows} candles are required to build the training dataset")
+
+    frame = pd.DataFrame(
+        [
+            {
+                "timestamp": candle.timestamp,
+                "open": candle.open,
+                "high": candle.high,
+                "low": candle.low,
+                "close": candle.close,
+                "volume": candle.volume,
+            }
+            for candle in candles
+        ]
+    ).sort_values("timestamp")
+    _ensure_no_duplicate_timestamps(frame)
+
+    deltas = frame["close"].diff().fillna(0.0)
+    gains = deltas.clip(lower=0.0)
+    losses = (-deltas).clip(lower=0.0)
+    avg_gain = gains.rolling(window=14, min_periods=14).mean()
+    avg_loss = losses.rolling(window=14, min_periods=14).mean()
+    rs = avg_gain / avg_loss.replace(0.0, np.nan)
+    frame["rsi_14"] = (100 - (100 / (1 + rs))).fillna(50.0)
+
+    # These are OHLCV-derived placeholders, not true sentiment feeds. They keep
+    # the real-candle flow trainable while the CCXT sentiment provider is added.
+    frame["open_interest_roc"] = frame["volume"].pct_change().replace([np.inf, -np.inf], 0.0).fillna(0.0)
+    returns = frame["close"].pct_change().replace([np.inf, -np.inf], 0.0).fillna(0.0)
+    rolling_scale = returns.rolling(window=30, min_periods=5).std().replace(0.0, np.nan).fillna(returns.std() or 1e-9)
+    frame["long_short_ratio"] = (1.0 + (returns / rolling_scale).clip(-0.25, 0.25)).fillna(1.0)
+    cvd_proxy = (np.sign(deltas) * frame["volume"]).cumsum()
+    frame["cvd_delta"] = cvd_proxy.diff().fillna(0.0)
+
+    feature_frame = frame[FEATURE_NAMES].replace([np.inf, -np.inf], 0.0).fillna(0.0)
+    start_index = len(frame) - target_n - training_rows
+    if start_index < 0:
+        raise ValidationError("Not enough candles to satisfy training_rows and target_n")
+    usable = training_rows
+    features = feature_frame.iloc[start_index : start_index + usable].to_numpy(dtype=float)
+    prices = frame["close"].iloc[start_index : start_index + usable + target_n].to_numpy(dtype=float)
+    labels, future_returns = _build_labels(
+        prices=prices,
+        usable=usable,
+        target_n=target_n,
+        take_profit_pct=take_profit_pct,
+        stop_loss_pct=stop_loss_pct,
+    )
+    split_indices = _split_indices(usable, validation_ratio, holdout_ratio)
+    if split_indices["train"][1] <= split_indices["train"][0]:
+        raise ValidationError("Training split is empty; increase training_rows or reduce validation/holdout ratios")
+
+    metadata = {
+        "feature_names": FEATURE_NAMES,
+        "dataset": {
+            "mode": "real",
+            "exchange_id": exchange_id,
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "source": "ccxt.fetch_ohlcv",
+            "sentiment_required": sentiment_required,
+            "sentiment_status": "ohlcv_proxy_features",
+            "raw_candle_count": len(candles),
+            "requested_training_rows": int(training_rows),
+            "usable_rows": int(usable),
+            "start_timestamp": frame["timestamp"].iloc[0].isoformat(),
+            "end_timestamp": frame["timestamp"].iloc[-1].isoformat(),
+            "usable_start_timestamp": frame["timestamp"].iloc[start_index].isoformat(),
+            "usable_end_timestamp": frame["timestamp"].iloc[start_index + usable - 1].isoformat(),
+            "split_indices": split_indices,
+        },
+        "stationarity_rules": {
+            "open_interest_roc": "ohlcv_volume_rate_of_change_proxy",
+            "cvd_delta": "ohlcv_directional_volume_delta_proxy",
+            "long_short_ratio": "ohlcv_return_pressure_proxy",
+            "rsi_14": "bounded_indicator",
+        },
+        "leakage_controls": {
+            "global_statistics": "forbidden",
+            "rolling_windows": "retrospective_only",
+            "closed_candles_only": True,
+            "sentiment_lag": "not_applied_proxy_features",
+        },
+    }
+    return DatasetBundle(features, labels, future_returns, split_indices, metadata)
+
+
 def train_xgboost(
     dataset: DatasetBundle,
     artifact_path: Path,
@@ -119,6 +231,8 @@ def train_xgboost(
 
     positives = int(y_train.sum())
     negatives = int(len(y_train) - positives)
+    if len(set(y_train.tolist())) < 2:
+        raise ValidationError("Training labels contain a single class; adjust target or data window parameters")
     scale_pos_weight = negatives / max(positives, 1)
 
     model = XGBClassifier(
@@ -202,6 +316,73 @@ def _rolling_mean(values: np.ndarray, window: int) -> np.ndarray:
     return result
 
 
+def save_dataset(dataset: DatasetBundle, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(
+        path,
+        features=dataset.features,
+        labels=dataset.labels,
+        future_returns=dataset.future_returns,
+        split_indices=json.dumps(dataset.split_indices),
+        feature_metadata=json.dumps(dataset.feature_metadata),
+    )
+
+
+def load_dataset(path: Path) -> DatasetBundle:
+    if not path.exists():
+        raise ValidationError(f"Training dataset artifact not found: {path}")
+    with np.load(path, allow_pickle=False) as data:
+        split_indices = {
+            key: tuple(value)
+            for key, value in json.loads(data["split_indices"].item()).items()
+        }
+        return DatasetBundle(
+            features=data["features"],
+            labels=data["labels"],
+            future_returns=data["future_returns"],
+            split_indices=split_indices,
+            feature_metadata=json.loads(data["feature_metadata"].item()),
+        )
+
+
+def _build_labels(
+    *,
+    prices: np.ndarray,
+    usable: int,
+    target_n: int,
+    take_profit_pct: float,
+    stop_loss_pct: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    labels = np.zeros(usable, dtype=int)
+    future_returns = np.zeros(usable)
+    for idx in range(usable):
+        current_price = prices[idx]
+        path = prices[idx + 1 : idx + target_n + 1]
+        rel = (path - current_price) / current_price
+        future_returns[idx] = rel[-1] if len(rel) else 0.0
+        take_hits = np.where(rel >= take_profit_pct)[0]
+        stop_hits = np.where(rel <= -stop_loss_pct)[0]
+        first_take = int(take_hits[0]) if take_hits.size else None
+        first_stop = int(stop_hits[0]) if stop_hits.size else None
+        labels[idx] = int(first_take is not None and (first_stop is None or first_take < first_stop))
+    return labels, future_returns
+
+
+def _split_indices(usable: int, validation_ratio: float, holdout_ratio: float) -> dict[str, tuple[int, int]]:
+    train_end = int(usable * (1 - validation_ratio - holdout_ratio))
+    validation_end = int(usable * (1 - holdout_ratio))
+    return {
+        "train": (0, train_end),
+        "validation": (train_end, validation_end),
+        "holdout": (validation_end, usable),
+    }
+
+
+def _ensure_no_duplicate_timestamps(frame: pd.DataFrame) -> None:
+    if frame["timestamp"].duplicated().any():
+        raise ValidationError("Market data contains duplicate candle timestamps")
+
+
 def _ml_metrics(labels: np.ndarray, probabilities: np.ndarray) -> dict:
     predictions = probabilities >= 0.5
     labels_for_logloss = labels
@@ -230,4 +411,3 @@ def _largest_loss_streak(trade_returns: np.ndarray) -> int:
         else:
             current = 0
     return largest
-

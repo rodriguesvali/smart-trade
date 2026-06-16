@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import os
+
+os.environ["SMART_TRADE_DATA_MODE"] = "synthetic"
+
 from fastapi.testclient import TestClient
 
 from app.main import app

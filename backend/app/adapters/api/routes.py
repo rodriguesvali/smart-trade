@@ -59,6 +59,9 @@ def create_training_run(
                 strategy_id=strategy_id,
                 auto_validate=request.auto_validate,
                 overrides={
+                    "exchange_id": request.exchange_id,
+                    "data_mode": request.data_mode,
+                    "sentiment_required": request.sentiment_required,
                     "symbol": request.symbol,
                     "timeframe": request.timeframe,
                     "target_n": request.target_n,
@@ -184,6 +187,7 @@ def _model_detail(model: TrainedModel) -> TrainedModelDetail:
     return TrainedModelDetail(
         **_model_summary(model).model_dump(),
         artifact_path=model.artifact_path,
+        dataset_metadata=model.feature_schema.get("dataset", {}),
         feature_schema=model.feature_schema,
         target_parameters=model.target_parameters,
         training_metrics=model.training_metrics,

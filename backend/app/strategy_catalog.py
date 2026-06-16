@@ -31,6 +31,9 @@ def strategy_payload() -> dict:
             ],
         },
         "default_parameters": {
+            "exchange_id": settings.default_exchange_id,
+            "data_mode": settings.data_mode,
+            "sentiment_required": settings.sentiment_required,
             "symbol": settings.default_symbol,
             "timeframe": settings.default_timeframe,
             "target_n": settings.default_target_n,

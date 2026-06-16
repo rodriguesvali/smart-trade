@@ -2,7 +2,7 @@
 
 ## Status
 
-Build backend em andamento para o MVP resetado do pipeline de treinamento.
+Build backend em andamento para o MVP resetado do pipeline de treinamento. A fatia atual adiciona treinamento com candles reais via CCXT, mantendo o dataset sintético apenas como modo explícito de desenvolvimento/teste.
 
 ## Escopo Implementado
 
@@ -12,10 +12,16 @@ Build backend em andamento para o MVP resetado do pipeline de treinamento.
 - Endpoint para abrir detalhes da estratégia.
 - Endpoint para iniciar treinamento.
 - `timeframe` tratado como parâmetro de treinamento, com default `M1`, e não como metadado fixo da estratégia.
+- `exchange_id`, `data_mode` e `sentiment_required` tratados como parâmetros/configuração de treinamento.
+- Adapter público CCXT para coleta de candles OHLCV reais da exchange configurada.
+- Feature engineering real com pandas/NumPy para RSI/IFR e proxies derivados de OHLCV quando sentimento real não é exigido.
+- Gate explícito para sentimento real: se `sentiment_required=true`, o treinamento falha até existir provider real para Open Interest, Long/Short Ratio e CVD-like delta.
 - Geração de um novo modelo treinado por execução.
 - Persistência de execução, modelo, métricas, resultados de validação e eventos de auditoria via SQLAlchemy.
 - Treinamento XGBoost determinístico sobre dataset sintético de desenvolvimento, com features RSI/IFR, Open Interest RoC, Long/Short Ratio e CVD delta.
+- Treinamento XGBoost com dataset real salvo junto ao artefato do modelo em `.dataset.npz`, permitindo validação reprodutível do mesmo modelo.
 - Artefato XGBoost salvo em formato nativo `.json`.
+- Resposta de modelo expõe `dataset_metadata` com modo, exchange, símbolo, timeframe, fonte, período e janelas cronológicas.
 - Endpoint explícito para executar validação do modelo pelo Swagger.
 - Scorecard de validação com métricas de ML e métricas operacionais simuladas.
 - Endpoints de aprovação/rejeição incluídos como continuação natural do ciclo, com rejeição exigindo comentário.
@@ -30,7 +36,7 @@ Após revisão arquitetural, o backend foi reorganizado para separar domínio, a
   - Enums de status para estratégias, execuções, modelos e decisões.
   - Políticas de transição: aprovação apenas de modelo `VALIDATED`, rejeição com comentário obrigatório, finalização imutável de modelos aprovados/rejeitados.
 - `backend/app/application/ports/`
-  - Portas para repositórios, trainer, validator, relógio e geração de IDs.
+  - Portas para repositórios, trainer, validator, market data, relógio e geração de IDs.
 - `backend/app/application/use_cases/`
   - Casos de uso de treinamento, validação, consulta, aprovação e rejeição.
   - Não importa FastAPI, SQLAlchemy, XGBoost, sklearn, numpy nem filesystem.
@@ -41,14 +47,16 @@ Após revisão arquitetural, o backend foi reorganizado para separar domínio, a
   - Adapter SQLAlchemy.
   - Converte records ORM para entidades de domínio e vice-versa.
 - `backend/app/adapters/ml/`
-  - Adapter XGBoost/dataset sintético de desenvolvimento.
+  - Adapters XGBoost para dataset real e dataset sintético de desenvolvimento.
   - Implementa as portas `ModelTrainer` e `ModelValidator`.
+- `backend/app/adapters/market_data/`
+  - Adapter público CCXT para candles OHLCV.
 - `backend/app/infrastructure/`
   - Configuração, sessão de banco, composição de dependências, relógio e UUID.
 
 Checagem executada:
 
-- `rg -n "fastapi|sqlalchemy|xgboost|sklearn|numpy|Path\\(" backend/app/domain backend/app/application`: sem ocorrências.
+- `rg -n "fastapi|sqlalchemy|ccxt|pandas|xgboost|sklearn|numpy|Path\\(" backend/app/domain backend/app/application`: sem ocorrências.
 
 ## Documentação Consultada
 
@@ -61,6 +69,7 @@ Checagem executada:
 - `GET /api/strategies`
 - `GET /api/strategies/{strategy_id}`
 - `POST /api/strategies/{strategy_id}/training-runs`
+  - Corpo aceita `exchange_id`, `data_mode`, `sentiment_required`, `symbol`, `timeframe`, `target_n`, `take_profit_pct`, `stop_loss_pct` e `training_rows`.
 - `GET /api/training-runs/{run_id}`
 - `GET /api/strategies/{strategy_id}/models`
 - `GET /api/models/{model_id}`
@@ -74,10 +83,18 @@ Checagem executada:
 - O backend usa SQLite por padrão para execução local imediata (`sqlite:///./var/smart_trade.db`) e aceita `SMART_TRADE_DATABASE_URL` para MySQL, alinhado ao `compose.yaml`.
 - A validação automática prevista no SAD pode ser acionada pelo campo `auto_validate` do endpoint de treinamento. Para o fluxo Swagger solicitado, o default é `false`, permitindo treinar primeiro e depois executar validação manualmente via `POST /api/models/{model_id}/validate`.
 - Alembic ainda não foi materializado nesta fatia; a persistência usa `create_all` no startup para permitir validação rápida do fluxo backend. A próxima fatia de build deve substituir isso por migrações Alembic versionadas.
+- O modo de produto default é `SMART_TRADE_DATA_MODE=real`, usando `ccxt.fetch_ohlcv` para candles fechados. Para testes automatizados, `SMART_TRADE_DATA_MODE=synthetic` evita dependência de rede.
+- Enquanto o provider real de sentimento não existir, `sentiment_required=false` treina com candles reais e proxies OHLCV claramente marcados em `feature_schema.dataset.sentiment_status=ohlcv_proxy_features`; `sentiment_required=true` falha de forma explícita.
 
 ## Evidência de Verificação
 
-- `pytest -q backend/tests`: 1 passed.
+- `backend/.venv/bin/python -m pytest -q backend/tests`: 3 passed.
+- Smoke interno do builder real: dataset real em memória produziu `(252, 4)` features com metadados `mode=real`.
+- Smoke CCXT público: `binance BTC/USDT M1` retornou 5 candles fechados.
+- Smoke HTTP em modo real com `binance BTC/USDT M1`:
+  - `POST /api/strategies/{strategy_id}/training-runs` retornou execução `TRAINED`.
+  - `GET /api/models/{model_id}` retornou `dataset_metadata.mode=real`, `source=ccxt.fetch_ohlcv`, `requested_training_rows=180` e `usable_rows=180`.
+  - `POST /api/models/{model_id}/validate` retornou modelo `VALIDATED`.
 - Smoke HTTP com servidor local:
   - `GET /health` retornou `{"status":"ok"}`.
   - `GET /api/strategies` retornou exatamente uma estratégia, `rsi_sentiment_xgboost_m1`.
@@ -87,11 +104,12 @@ Checagem executada:
 
 ## Como Executar
 
-Servidor local iniciado nesta sessão:
+Para iniciar o servidor local:
 
+- `cd backend`
+- `source .venv/bin/activate`
+- `uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload`
 - Swagger: `http://127.0.0.1:8000/docs`
-- OpenAPI JSON: `http://127.0.0.1:8000/openapi.json`
-- Health: `http://127.0.0.1:8000/health`
 
 Fluxo mínimo via Swagger:
 
@@ -100,3 +118,18 @@ Fluxo mínimo via Swagger:
 3. Copiar `model_id` da resposta.
 4. `GET /api/models/{model_id}`
 5. `POST /api/models/{model_id}/validate`
+
+Payload mínimo real recomendado no Swagger:
+
+```json
+{
+  "exchange_id": "binance",
+  "symbol": "BTC/USDT",
+  "timeframe": "M1",
+  "training_rows": 180,
+  "target_n": 5,
+  "take_profit_pct": 0.0002,
+  "stop_loss_pct": 0.0002,
+  "sentiment_required": false
+}
+```

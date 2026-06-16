@@ -26,6 +26,9 @@ class TrainingRequest(BaseModel):
         default=False,
         description="If true, run validation immediately after training. Swagger users can keep false and call /validate explicitly.",
     )
+    exchange_id: str | None = None
+    data_mode: str | None = Field(default=None, pattern="^(real|synthetic)$")
+    sentiment_required: bool | None = None
     symbol: str | None = None
     timeframe: str | None = None
     target_n: int | None = Field(default=None, ge=2, le=240)
@@ -70,6 +73,7 @@ class ValidationResultRead(BaseModel):
 
 class TrainedModelDetail(TrainedModelSummary):
     artifact_path: str
+    dataset_metadata: dict[str, Any]
     feature_schema: dict[str, Any]
     target_parameters: dict[str, Any]
     training_metrics: dict[str, Any]
