@@ -47,6 +47,7 @@ import {
           <h2>{{ strategy()!.name }}</h2>
         </div>
         <div class="button-row">
+          <p-button icon="pi pi-arrow-left" label="Back" size="small" severity="secondary" (onClick)="back()" />
           <p-button icon="pi pi-refresh" label="Refresh" size="small" severity="secondary" (onClick)="load()" />
           <p-button icon="pi pi-play" label="Start Training" size="small" (onClick)="trainingDialog.open(strategy()!.default_parameters)" />
         </div>
@@ -161,6 +162,10 @@ export class StrategyDetailPage {
 
   openModel(model: TrainedModelSummary): void {
     void this.router.navigate(['/strategies', model.strategy_id, 'models', model.id]);
+  }
+
+  back(): void {
+    void this.router.navigate(['/strategies']);
   }
 
   private pollRun(runId: string): void {

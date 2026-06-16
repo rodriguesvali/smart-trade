@@ -8,9 +8,15 @@
   --app-border: #d8dee8;
   --app-text: #141922;
   --app-muted: #647083;
-  --app-sidebar: #101820;
-  --app-sidebar-active: #203244;
+  --app-sidebar: #ffffff;
+  --app-sidebar-border: #d8dee8;
+  --app-sidebar-text: #17202c;
+  --app-sidebar-muted: #647083;
+  --app-sidebar-link: #334155;
+  --app-sidebar-active: #e7f3f1;
+  --app-sidebar-active-text: #0f5f55;
   --app-accent: #1f7a6d;
+  --app-accent-contrast: #ffffff;
   --app-shadow: 0 8px 24px rgba(20, 25, 34, 0.08);
 }
 
@@ -23,8 +29,14 @@
   --app-text: #eef2f6;
   --app-muted: #9da8b6;
   --app-sidebar: #090d11;
+  --app-sidebar-border: #17212b;
+  --app-sidebar-text: #f8fafc;
+  --app-sidebar-muted: #a7b1bd;
+  --app-sidebar-link: #cbd5df;
   --app-sidebar-active: #1d2b37;
+  --app-sidebar-active-text: #ffffff;
   --app-accent: #48b7a6;
+  --app-accent-contrast: #07100f;
   --app-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
 }
 
@@ -47,6 +59,7 @@ body {
 }
 
 .app-shell {
+  background: var(--app-bg);
   display: grid;
   grid-template-columns: 264px minmax(0, 1fr);
   min-height: 100vh;
@@ -54,7 +67,8 @@ body {
 
 .sidebar {
   background: var(--app-sidebar);
-  color: #f8fafc;
+  border-right: 1px solid var(--app-sidebar-border);
+  color: var(--app-sidebar-text);
   display: flex;
   flex-direction: column;
   gap: 28px;
@@ -72,7 +86,7 @@ body {
   align-items: center;
   background: var(--app-accent);
   border-radius: 8px;
-  color: #ffffff;
+  color: var(--app-accent-contrast);
   display: grid;
   font-weight: 800;
   height: 40px;
@@ -86,7 +100,7 @@ body {
 }
 
 .brand span {
-  color: #a7b1bd;
+  color: var(--app-sidebar-muted);
   font-size: 12px;
   margin-top: 2px;
 }
@@ -99,7 +113,7 @@ body {
 .nav a {
   align-items: center;
   border-radius: 8px;
-  color: #cbd5df;
+  color: var(--app-sidebar-link);
   display: flex;
   gap: 10px;
   padding: 11px 12px;
@@ -109,10 +123,11 @@ body {
 .nav a.active,
 .nav a:hover {
   background: var(--app-sidebar-active);
-  color: #ffffff;
+  color: var(--app-sidebar-active-text);
 }
 
 .workspace {
+  background: var(--app-bg);
   min-width: 0;
 }
 

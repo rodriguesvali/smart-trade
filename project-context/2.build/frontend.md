@@ -15,6 +15,7 @@ Primeira versão do frontend Angular + PrimeNG implementada para o MVP do pipeli
   - `features/audit`.
 - PrimeNG configurado com tema Aura.
 - Suporte Light/Dark/System via `ThemeService`, classe `.app-dark` e persistência em `localStorage`.
+- Sidebar e shell do dashboard alinhados aos tokens Light/Dark para evitar áreas fixas em tema escuro quando o modo claro está ativo.
 - App shell operacional com sidebar, header, status da API, toast e confirm dialog.
 - Rotas:
   - `/dashboard`;
@@ -35,7 +36,7 @@ Primeira versão do frontend Angular + PrimeNG implementada para o MVP do pipeli
   - `POST /api/models/{model_id}/reject`;
   - `GET /api/audit-events`.
 - Tela de estratégias com tabela e ação `Open`.
-- Tela de detalhe da estratégia com parâmetros default, modelos treinados e início de treinamento.
+- Tela de detalhe da estratégia com retorno para lista, parâmetros default, modelos treinados e início de treinamento.
 - Dialog de treinamento com Reactive Forms, validações básicas e aviso de retenção pública da Binance.
 - Campos `Take Profit` e `Stop Loss` exibidos em percentual para o usuário e convertidos para fração decimal no payload do backend.
 - Polling de execução assíncrona via `GET /api/training-runs/{run_id}`.
