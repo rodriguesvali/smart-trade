@@ -39,6 +39,7 @@ Primeira versão do frontend Angular + PrimeNG implementada para o MVP do pipeli
 - Tela de estratégias com tabela e ação `Open`.
 - Tela de detalhe da estratégia com retorno para lista, parâmetros default, modelos treinados e início de treinamento.
 - Dialog de treinamento com Reactive Forms, validações básicas e aviso de retenção pública da Binance.
+- Campo manual `Training Rows` removido do diálogo; a UI agora informa a janela calculada pelo backend a partir do timeframe, usando 30 dias brutos, warmup de 80 candles, `target_n` e holdout final de 72h.
 - Campos `Take Profit` e `Stop Loss` exibidos em percentual para o usuário e convertidos para fração decimal no payload do backend.
 - Polling de execução assíncrona via `GET /api/training-runs/{run_id}`.
 - Tela de detalhe do modelo com scorecard de métricas, validação, aprovação, rejeição com comentário e exclusão de modelo `REJECTED` após confirmação.
@@ -72,6 +73,7 @@ Decisões:
 - Features isolam modelos, páginas e componentes próprios.
 - O frontend trata `VALIDATED` como evidência técnica, não como aprovação operacional.
 - O formulário de treinamento apresenta percentuais de forma amigável, mas preserva o contrato backend `take_profit_pct`/`stop_loss_pct` como frações decimais.
+- O formulário de treinamento não envia mais `training_rows`; esse valor é calculado e auditado no backend em `requested_parameters.training_window_policy`.
 
 ## Documentação Consultada
 
@@ -123,7 +125,7 @@ No VS Code:
 ## Evidência de Verificação
 
 - `cd frontend && npm run build`: passou.
-  - Observação: warning de budget inicial do Angular, bundle inicial `670.61 kB` contra budget default `500 kB`, causado pela combinação Angular + PrimeNG. Não bloqueia o MVP.
+  - Observação: warning de budget inicial do Angular, bundle inicial `671.25 kB` contra budget default `500 kB`, causado pela combinação Angular + PrimeNG. Não bloqueia o MVP.
 - `cd backend && .venv/bin/python -m pytest -q tests`: 8 passed.
 - `.vscode/tasks.json` e `.vscode/launch.json` válidos via `python -m json.tool`.
 - Smoke HTTP:

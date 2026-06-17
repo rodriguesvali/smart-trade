@@ -15,6 +15,7 @@ from smart_trade.application.ports.repositories import (
 from smart_trade.domain.entities import ApprovalRecord, AuditEvent, TrainedModel, TrainingRun, ValidationResult
 from smart_trade.domain.enums import ApprovalDecision, TrainedModelStatus, TrainingRunStatus
 from smart_trade.domain.exceptions import InvalidStateTransitionError, NotFoundError, ValidationError
+from smart_trade.domain.training_window import calculate_training_window
 
 
 @dataclass(frozen=True)
@@ -105,6 +106,7 @@ class TrainingUseCases:
         strategy = self.get_strategy(command.strategy_id)
         strategy.ensure_available()
         parameters = strategy.default_parameters | {k: v for k, v in command.overrides.items() if v is not None}
+        parameters = _resolve_training_window_parameters(parameters)
         _validate_training_parameters(parameters)
         run = TrainingRun(
             id=self.ids.new_id(),
@@ -112,7 +114,11 @@ class TrainingUseCases:
             strategy_version=strategy.version,
             status=TrainingRunStatus.PENDING,
             requested_parameters=parameters,
-            window_configuration={"split": "chronological", "partitions": ["train", "validation_internal", "holdout"]},
+            window_configuration={
+                "split": "chronological",
+                "partitions": ["train", "validation_internal", "holdout"],
+                "policy": parameters["training_window_policy"],
+            },
             created_at=self.clock.now(),
             auto_validate=command.auto_validate,
             progress_phase="pending",
@@ -309,3 +315,26 @@ def _validate_training_parameters(parameters: dict) -> None:
             raise ValidationError(
                 f"{key} must be a decimal fraction, not a whole percent. Use 0.01 for 1%, 0.001 for 0.1%."
             )
+    if float(parameters["validation_ratio"]) <= 0:
+        raise ValidationError("validation_ratio must be greater than zero")
+    if float(parameters["validation_ratio"]) + float(parameters["holdout_ratio"]) >= 1:
+        raise ValidationError("validation_ratio plus holdout_ratio must leave a non-empty training partition")
+
+
+def _resolve_training_window_parameters(parameters: dict) -> dict:
+    target_n = int(parameters["target_n"])
+    policy = calculate_training_window(str(parameters["timeframe"]), target_n)
+
+    resolved = dict(parameters)
+    original_training_rows = parameters.get("training_rows")
+    original_holdout_ratio = parameters.get("holdout_ratio")
+    resolved["training_rows"] = policy["usable_rows"]
+    resolved["holdout_ratio"] = policy["holdout_ratio"]
+    resolved["feature_warmup_rows"] = policy["feature_warmup_rows"]
+    resolved["training_window_policy"] = policy | {
+        "ignored_request_overrides": {
+            "training_rows": original_training_rows,
+            "holdout_ratio": original_holdout_ratio,
+        }
+    }
+    return resolved

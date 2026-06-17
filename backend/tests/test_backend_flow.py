@@ -10,6 +10,7 @@ os.environ["SMART_TRADE_ARTIFACT_DIR"] = "./var/test-models"
 from fastapi.testclient import TestClient
 
 from smart_trade.adapters.api.schemas import TrainingRequest
+from smart_trade.domain.training_window import calculate_training_window
 from smart_trade_api.main import app
 from smart_trade_training_worker.main import run_once
 
@@ -26,17 +27,22 @@ def test_training_and_validation_flow() -> None:
         assert detail.json()["name"] == "RSI Sentiment XGBoost"
         assert "timeframe" not in detail.json()
         assert detail.json()["default_parameters"]["timeframe"] == "M5"
+        assert detail.json()["default_parameters"]["training_rows"] == 8545
+        assert detail.json()["default_parameters"]["training_window_policy"]["holdout_rows"] == 864
 
         run_response = client.post(
             f"/api/strategies/{strategy_id}/training-runs",
-            json={"timeframe": "M5", "training_rows": 220, "target_n": 8},
+            json={"timeframe": "H1", "training_rows": 220, "target_n": 8},
         )
         assert run_response.status_code == 202
         run_payload = run_response.json()
         assert run_payload["status"] == "PENDING"
         assert run_payload["model_id"] is None
         assert run_payload["progress_phase"] == "pending"
-        assert run_payload["requested_parameters"]["timeframe"] == "M5"
+        assert run_payload["requested_parameters"]["timeframe"] == "H1"
+        assert run_payload["requested_parameters"]["training_rows"] == 632
+        assert run_payload["requested_parameters"]["training_window_policy"]["holdout_rows"] == 72
+        assert run_payload["requested_parameters"]["training_window_policy"]["ignored_request_overrides"]["training_rows"] == 220
 
         for _ in range(10):
             run_once("test-worker")
@@ -60,6 +66,8 @@ def test_training_and_validation_flow() -> None:
         validated_model = validation_response.json()
         assert validated_model["status"] == "VALIDATED"
         assert validated_model["validation_summary"]["ml_metrics"]["row_count"] > 0
+        assert "entry_candidates" in validated_model["validation_summary"]["operational_metrics"]
+        assert "walk_forward" in validated_model["validation_summary"]["window_metadata"]
         artifact_path = Path(validated_model["artifact_path"])
         dataset_path = artifact_path.with_suffix(".dataset.npz")
         assert artifact_path.exists()
@@ -126,7 +134,16 @@ def test_training_rejects_whole_number_percentages() -> None:
         assert "Input should be less than 1" in response.text
 
 
-def test_training_request_accepts_three_month_m5_window() -> None:
+def test_training_request_accepts_deprecated_training_rows_override() -> None:
     request = TrainingRequest(training_rows=25_920)
 
     assert request.training_rows == 25_920
+
+
+def test_m5_training_window_is_calculated_from_thirty_day_raw_window() -> None:
+    policy = calculate_training_window("M5", target_n=15)
+
+    assert policy["raw_window_rows"] == 8640
+    assert policy["usable_rows"] == 8545
+    assert policy["holdout_rows"] == 864
+    assert policy["train_validation_rows"] == 7681

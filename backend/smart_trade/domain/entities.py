@@ -128,6 +128,7 @@ class TrainedModel:
         self.validation_results.append(result)
         self.validation_summary = {
             "latest_validation_result_id": result.id,
+            "window_metadata": result.window_metadata,
             "ml_metrics": result.ml_metrics,
             "operational_metrics": result.operational_metrics,
         }

@@ -49,7 +49,7 @@ class TrainingRequest(BaseModel):
         default=None,
         ge=180,
         le=100_000,
-        description="Number of usable candles. For 90 days on M5 use 25920.",
+        description="Deprecated override. The backend calculates usable rows from timeframe using a 30-day raw window and 72h holdout.",
     )
 
 

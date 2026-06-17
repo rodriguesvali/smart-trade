@@ -65,7 +65,7 @@ import {
           <app-metric-tile label="Model" [value]="strategy()!.model_family" />
           <app-metric-tile label="Version" [value]="strategy()!.version" />
           <app-metric-tile label="Default Timeframe" [value]="strategy()!.default_parameters.timeframe" />
-          <app-metric-tile label="Training Rows" [value]="strategy()!.default_parameters.training_rows" />
+          <app-metric-tile label="Calculated Rows" [value]="strategy()!.default_parameters.training_rows" />
         </div>
       </section>
 

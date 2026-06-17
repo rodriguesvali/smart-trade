@@ -26,6 +26,8 @@ export interface TrainingParameters {
   training_rows: number;
   validation_ratio: number;
   holdout_ratio: number;
+  feature_warmup_rows?: number;
+  training_window_policy?: Record<string, unknown>;
   probability_threshold: number;
   xgboost?: Record<string, number>;
 }
@@ -41,7 +43,6 @@ export interface TrainingRequest {
   target_n?: number;
   take_profit_pct?: number;
   stop_loss_pct?: number;
-  training_rows?: number;
 }
 
 export interface TrainingRunRead {

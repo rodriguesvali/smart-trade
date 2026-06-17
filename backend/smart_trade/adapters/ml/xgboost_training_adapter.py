@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import timedelta
 from pathlib import Path
 
 from smart_trade.application.ports.market_data import MarketDataProvider
@@ -37,6 +36,7 @@ class SyntheticXGBoostTrainingAdapter:
             validation_ratio=float(parameters["validation_ratio"]),
             holdout_ratio=float(parameters["holdout_ratio"]),
             random_seed=int(parameters.get("global_random_seed", self.random_seed)),
+            feature_warmup_rows=int(parameters.get("feature_warmup_rows", 80)),
         )
         artifact_path = self.artifact_dir / f"{model_id}.json"
         dataset_path = self.artifact_dir / f"{model_id}.dataset.npz"
@@ -65,6 +65,7 @@ class SyntheticXGBoostTrainingAdapter:
             dataset=dataset,
             artifact_path=Path(artifact_path),
             probability_threshold=float(parameters["probability_threshold"]),
+            parameters=parameters,
         )
         return ValidationOutput(
             validation_type="walk_forward_and_holdout",
@@ -90,7 +91,8 @@ class RealXGBoostTrainingAdapter:
     def train(self, *, model_id: str, parameters: dict) -> TrainingOutput:
         rows = int(parameters["training_rows"])
         target_n = int(parameters["target_n"])
-        candle_rows = rows + target_n + 80
+        feature_warmup_rows = int(parameters.get("feature_warmup_rows", 80))
+        candle_rows = rows + target_n + feature_warmup_rows
         exchange_id = str(parameters["exchange_id"])
         symbol = str(parameters["symbol"])
         timeframe = str(parameters["timeframe"])
@@ -106,7 +108,7 @@ class RealXGBoostTrainingAdapter:
                 exchange_id=exchange_id,
                 symbol=str(parameters.get("sentiment_symbol") or symbol),
                 timeframe=timeframe,
-                since=candles[0].timestamp - timedelta(hours=8),
+                since=candles[0].timestamp,
                 until=candles[-1].timestamp,
             )
         except ValidationError:
@@ -154,6 +156,7 @@ class RealXGBoostTrainingAdapter:
             dataset=dataset,
             artifact_path=Path(artifact_path),
             probability_threshold=float(parameters["probability_threshold"]),
+            parameters=parameters,
         )
         return ValidationOutput(
             validation_type="walk_forward_and_holdout",

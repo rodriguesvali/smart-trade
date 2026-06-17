@@ -22,6 +22,9 @@ class DatasetBundle:
     features: np.ndarray
     labels: np.ndarray
     future_returns: np.ndarray
+    close_prices: np.ndarray
+    high_prices: np.ndarray
+    low_prices: np.ndarray
     split_indices: dict[str, tuple[int, int]]
     feature_metadata: dict
 
@@ -35,11 +38,15 @@ def generate_dataset(
     validation_ratio: float,
     holdout_ratio: float,
     random_seed: int,
+    feature_warmup_rows: int = 80,
 ) -> DatasetBundle:
     rng = np.random.default_rng(random_seed)
-    returns = rng.normal(0.00002, 0.0018, rows + target_n + 80)
+    returns = rng.normal(0.00002, 0.0018, rows + target_n + feature_warmup_rows)
     cycle = np.sin(np.linspace(0, 20, returns.size)) * 0.0007
     price = 100_000 * np.exp(np.cumsum(returns + cycle))
+    wick_pct = np.abs(rng.normal(0.00035, 0.00015, price.size))
+    high = price * (1 + wick_pct)
+    low = price * (1 - wick_pct)
 
     deltas = np.diff(price, prepend=price[0])
     gains = np.clip(deltas, 0, None)
@@ -59,7 +66,7 @@ def generate_dataset(
     long_short_ratio = 1.0 + 0.18 * np.sin(np.linspace(0, 15, price.size)) + rng.normal(0, 0.035, price.size)
     taker_buy_sell_ratio = 1.0 + 0.12 * np.sin(np.linspace(0, 25, price.size)) + rng.normal(0, 0.03, price.size)
 
-    start = 40
+    start = feature_warmup_rows
     usable = rows
     end = start + usable
     features = np.column_stack(
@@ -75,14 +82,19 @@ def generate_dataset(
     future_returns = np.zeros(usable)
     for idx in range(usable):
         current_price = price[start + idx]
-        path = price[start + idx + 1 : start + idx + target_n + 1]
-        rel = (path - current_price) / current_price
+        future_path = price[start + idx + 1 : start + idx + target_n + 1]
+        rel = (future_path - current_price) / current_price
         future_returns[idx] = rel[-1] if len(rel) else 0.0
-        take_hits = np.where(rel >= take_profit_pct)[0]
-        stop_hits = np.where(rel <= -stop_loss_pct)[0]
-        first_take = int(take_hits[0]) if take_hits.size else None
-        first_stop = int(stop_hits[0]) if stop_hits.size else None
-        labels[idx] = int(first_take is not None and (first_stop is None or first_take < first_stop))
+        gross_return, _, _ = _trade_path_return(
+            close_prices=price[start : start + usable + target_n],
+            high_prices=high[start : start + usable + target_n],
+            low_prices=low[start : start + usable + target_n],
+            row_index=idx,
+            target_n=target_n,
+            take_profit_pct=take_profit_pct,
+            stop_loss_pct=stop_loss_pct,
+        )
+        labels[idx] = int(gross_return >= take_profit_pct)
 
     train_end = int(usable * (1 - validation_ratio - holdout_ratio))
     validation_end = int(usable * (1 - holdout_ratio))
@@ -104,8 +116,17 @@ def generate_dataset(
             "rolling_windows": "retrospective_only",
             "sentiment_lag": "synthetic_closed_candle_source",
         },
+        "dataset": {
+            "mode": "synthetic",
+            "feature_warmup_rows": int(feature_warmup_rows),
+            "requested_training_rows": int(rows),
+            "usable_rows": int(usable),
+        },
     }
-    return DatasetBundle(features, labels, future_returns, split_indices, metadata)
+    close_prices = price[start : start + usable + target_n]
+    high_prices = high[start : start + usable + target_n]
+    low_prices = low[start : start + usable + target_n]
+    return DatasetBundle(features, labels, future_returns, close_prices, high_prices, low_prices, split_indices, metadata)
 
 
 def build_dataset_from_candles(
@@ -172,8 +193,12 @@ def build_dataset_from_candles(
     usable = training_rows
     features = feature_frame.iloc[start_index : start_index + usable].to_numpy(dtype=float)
     prices = frame["close"].iloc[start_index : start_index + usable + target_n].to_numpy(dtype=float)
+    highs = frame["high"].iloc[start_index : start_index + usable + target_n].to_numpy(dtype=float)
+    lows = frame["low"].iloc[start_index : start_index + usable + target_n].to_numpy(dtype=float)
     labels, future_returns = _build_labels(
-        prices=prices,
+        close_prices=prices,
+        high_prices=highs,
+        low_prices=lows,
         usable=usable,
         target_n=target_n,
         take_profit_pct=take_profit_pct,
@@ -216,7 +241,7 @@ def build_dataset_from_candles(
             "sentiment_lag": "merge_asof_backward_only" if sentiment else "not_applied_proxy_features",
         },
     }
-    return DatasetBundle(features, labels, future_returns, split_indices, metadata)
+    return DatasetBundle(features, labels, future_returns, prices, highs, lows, split_indices, metadata)
 
 
 def train_xgboost(
@@ -239,19 +264,15 @@ def train_xgboost(
         raise ValidationError("Training labels contain a single class; adjust target or data window parameters")
     scale_pos_weight = negatives / max(positives, 1)
 
-    model = XGBClassifier(
-        objective="binary:logistic",
-        eval_metric="logloss",
-        random_state=random_seed,
-        seed=random_seed,
-        max_depth=int(xgboost_params.get("max_depth", 3)),
-        learning_rate=float(xgboost_params.get("learning_rate", 0.08)),
-        n_estimators=int(xgboost_params.get("n_estimators", 60)),
-        subsample=float(xgboost_params.get("subsample", 0.9)),
-        colsample_bytree=float(xgboost_params.get("colsample_bytree", 0.9)),
-        scale_pos_weight=float(xgboost_params.get("scale_pos_weight", scale_pos_weight)),
+    model = _fit_xgboost(
+        x_train=x_train,
+        y_train=y_train,
+        x_validation=x_validation,
+        y_validation=y_validation,
+        random_seed=random_seed,
+        xgboost_params=xgboost_params,
+        scale_pos_weight=scale_pos_weight,
     )
-    model.fit(x_train, y_train, eval_set=[(x_validation, y_validation)], verbose=False)
     artifact_path.parent.mkdir(parents=True, exist_ok=True)
     model.save_model(artifact_path)
 
@@ -268,39 +289,67 @@ def train_xgboost(
     return metrics, model
 
 
+def _fit_xgboost(
+    *,
+    x_train: np.ndarray,
+    y_train: np.ndarray,
+    x_validation: np.ndarray,
+    y_validation: np.ndarray,
+    random_seed: int,
+    xgboost_params: dict,
+    scale_pos_weight: float,
+) -> XGBClassifier:
+    model = XGBClassifier(
+        objective="binary:logistic",
+        eval_metric="logloss",
+        random_state=random_seed,
+        seed=random_seed,
+        max_depth=int(xgboost_params.get("max_depth", 3)),
+        learning_rate=float(xgboost_params.get("learning_rate", 0.08)),
+        n_estimators=int(xgboost_params.get("n_estimators", 60)),
+        subsample=float(xgboost_params.get("subsample", 0.9)),
+        colsample_bytree=float(xgboost_params.get("colsample_bytree", 0.9)),
+        scale_pos_weight=float(xgboost_params.get("scale_pos_weight", scale_pos_weight)),
+    )
+    model.fit(x_train, y_train, eval_set=[(x_validation, y_validation)], verbose=False)
+    return model
+
+
 def validate_model(
     dataset: DatasetBundle,
     artifact_path: Path,
     probability_threshold: float,
+    parameters: dict | None = None,
 ) -> dict:
+    parameters = parameters or {}
     model = XGBClassifier()
     model.load_model(artifact_path)
     holdout_start, holdout_end = dataset.split_indices["holdout"]
     x_holdout = dataset.features[holdout_start:holdout_end]
     y_holdout = dataset.labels[holdout_start:holdout_end]
-    holdout_returns = dataset.future_returns[holdout_start:holdout_end]
     probabilities = model.predict_proba(x_holdout)[:, 1]
     ml = _ml_metrics(y_holdout, probabilities)
 
-    signals = probabilities >= probability_threshold
-    trade_returns = holdout_returns[signals]
-    wins = trade_returns[trade_returns > 0]
-    losses = trade_returns[trade_returns <= 0]
-    gross_profit = float(wins.sum()) if wins.size else 0.0
-    gross_loss = float(abs(losses.sum())) if losses.size else 0.0
-    equity = np.cumsum(trade_returns) if trade_returns.size else np.array([0.0])
-    peaks = np.maximum.accumulate(equity)
-    drawdowns = peaks - equity
-    operational = {
-        "signals_generated": int(signals.sum()),
-        "simulated_trades": int(trade_returns.size),
-        "net_result": float(trade_returns.sum()) if trade_returns.size else 0.0,
-        "profit_factor": float(gross_profit / gross_loss) if gross_loss > 0 else None,
-        "max_drawdown": float(drawdowns.max()) if drawdowns.size else 0.0,
-        "win_rate": float((trade_returns > 0).mean()) if trade_returns.size else 0.0,
-        "largest_loss_streak": _largest_loss_streak(trade_returns),
-        "probability_threshold": probability_threshold,
-    }
+    target_n = int(parameters.get("target_n", 1))
+    take_profit_pct = float(parameters.get("take_profit_pct", 0.0))
+    stop_loss_pct = float(parameters.get("stop_loss_pct", 0.0))
+    operational = _simulate_strategy_backtest(
+        dataset=dataset,
+        probabilities=probabilities,
+        start_index=holdout_start,
+        probability_threshold=probability_threshold,
+        target_n=target_n,
+        take_profit_pct=take_profit_pct,
+        stop_loss_pct=stop_loss_pct,
+        entry_rsi_threshold=_entry_rsi_threshold(parameters),
+        fee_pct=_float_parameter(parameters, "fee_pct", 0.0),
+        slippage_pct=_float_parameter(parameters, "slippage_pct", 0.0),
+    )
+    walk_forward = _walk_forward_validation(
+        dataset=dataset,
+        parameters=parameters,
+        probability_threshold=probability_threshold,
+    )
     return {
         "ml_metrics": ml,
         "operational_metrics": operational,
@@ -308,6 +357,7 @@ def validate_model(
             "holdout_start_index": holdout_start,
             "holdout_end_index": holdout_end,
             "holdout_rows": int(len(x_holdout)),
+            "walk_forward": walk_forward,
         },
     }
 
@@ -327,6 +377,9 @@ def save_dataset(dataset: DatasetBundle, path: Path) -> None:
         features=dataset.features,
         labels=dataset.labels,
         future_returns=dataset.future_returns,
+        close_prices=dataset.close_prices,
+        high_prices=dataset.high_prices,
+        low_prices=dataset.low_prices,
         split_indices=json.dumps(dataset.split_indices),
         feature_metadata=json.dumps(dataset.feature_metadata),
     )
@@ -344,14 +397,27 @@ def load_dataset(path: Path) -> DatasetBundle:
             features=data["features"],
             labels=data["labels"],
             future_returns=data["future_returns"],
+            close_prices=_load_price_array(data, "close_prices"),
+            high_prices=_load_price_array(data, "high_prices"),
+            low_prices=_load_price_array(data, "low_prices"),
             split_indices=split_indices,
             feature_metadata=json.loads(data["feature_metadata"].item()),
         )
 
 
+def _load_price_array(data, key: str) -> np.ndarray:
+    if key in data.files:
+        return data[key]
+    if "close_prices" in data.files:
+        return data["close_prices"]
+    return _legacy_close_prices(data["future_returns"])
+
+
 def _build_labels(
     *,
-    prices: np.ndarray,
+    close_prices: np.ndarray,
+    high_prices: np.ndarray,
+    low_prices: np.ndarray,
     usable: int,
     target_n: int,
     take_profit_pct: float,
@@ -360,15 +426,20 @@ def _build_labels(
     labels = np.zeros(usable, dtype=int)
     future_returns = np.zeros(usable)
     for idx in range(usable):
-        current_price = prices[idx]
-        path = prices[idx + 1 : idx + target_n + 1]
+        current_price = close_prices[idx]
+        path = close_prices[idx + 1 : idx + target_n + 1]
         rel = (path - current_price) / current_price
         future_returns[idx] = rel[-1] if len(rel) else 0.0
-        take_hits = np.where(rel >= take_profit_pct)[0]
-        stop_hits = np.where(rel <= -stop_loss_pct)[0]
-        first_take = int(take_hits[0]) if take_hits.size else None
-        first_stop = int(stop_hits[0]) if stop_hits.size else None
-        labels[idx] = int(first_take is not None and (first_stop is None or first_take < first_stop))
+        gross_return, _, _ = _trade_path_return(
+            close_prices=close_prices,
+            high_prices=high_prices,
+            low_prices=low_prices,
+            row_index=idx,
+            target_n=target_n,
+            take_profit_pct=take_profit_pct,
+            stop_loss_pct=stop_loss_pct,
+        )
+        labels[idx] = int(gross_return >= take_profit_pct)
     return labels, future_returns
 
 
@@ -443,3 +514,228 @@ def _largest_loss_streak(trade_returns: np.ndarray) -> int:
         else:
             current = 0
     return largest
+
+
+def _simulate_strategy_backtest(
+    *,
+    dataset: DatasetBundle,
+    probabilities: np.ndarray,
+    start_index: int,
+    probability_threshold: float,
+    target_n: int,
+    take_profit_pct: float,
+    stop_loss_pct: float,
+    entry_rsi_threshold: float,
+    fee_pct: float,
+    slippage_pct: float,
+) -> dict:
+    trades: list[float] = []
+    exit_reasons: dict[str, int] = {"take_profit": 0, "stop_loss": 0, "time_exit": 0}
+    blocked_by_position = 0
+    entry_candidates = 0
+    model_signals = 0
+    next_available_index = start_index
+
+    for offset, probability in enumerate(probabilities):
+        row_index = start_index + offset
+        is_model_signal = probability >= probability_threshold
+        if is_model_signal:
+            model_signals += 1
+        is_entry_candidate = is_model_signal and dataset.features[row_index][0] <= entry_rsi_threshold
+        if is_entry_candidate:
+            entry_candidates += 1
+        if row_index < next_available_index:
+            if is_entry_candidate:
+                blocked_by_position += 1
+            continue
+        if not is_entry_candidate:
+            continue
+
+        gross_return, exit_offset, exit_reason = _trade_path_return(
+            close_prices=dataset.close_prices,
+            high_prices=dataset.high_prices,
+            low_prices=dataset.low_prices,
+            row_index=row_index,
+            target_n=target_n,
+            take_profit_pct=take_profit_pct,
+            stop_loss_pct=stop_loss_pct,
+        )
+        trades.append(gross_return - (2 * fee_pct) - (2 * slippage_pct))
+        exit_reasons[exit_reason] += 1
+        next_available_index = row_index + max(exit_offset, 1)
+
+    trade_returns = np.asarray(trades, dtype=float)
+    wins = trade_returns[trade_returns > 0]
+    losses = trade_returns[trade_returns <= 0]
+    gross_profit = float(wins.sum()) if wins.size else 0.0
+    gross_loss = float(abs(losses.sum())) if losses.size else 0.0
+    equity = np.cumsum(trade_returns) if trade_returns.size else np.array([0.0])
+    peaks = np.maximum.accumulate(equity)
+    drawdowns = peaks - equity
+    return {
+        "signals_generated": int(model_signals),
+        "entry_candidates": int(entry_candidates),
+        "blocked_by_open_position": int(blocked_by_position),
+        "simulated_trades": int(trade_returns.size),
+        "net_result": float(trade_returns.sum()) if trade_returns.size else 0.0,
+        "expectancy_per_trade": float(trade_returns.mean()) if trade_returns.size else 0.0,
+        "profit_factor": float(gross_profit / gross_loss) if gross_loss > 0 else None,
+        "max_drawdown": float(drawdowns.max()) if drawdowns.size else 0.0,
+        "win_rate": float((trade_returns > 0).mean()) if trade_returns.size else 0.0,
+        "largest_loss_streak": _largest_loss_streak(trade_returns),
+        "exit_reasons": exit_reasons,
+        "probability_threshold": probability_threshold,
+        "entry_rsi_threshold": entry_rsi_threshold,
+        "fee_pct": fee_pct,
+        "slippage_pct": slippage_pct,
+        "backtest_rules": [
+            "closed_candle_features",
+            "rsi_entry_gate",
+            "model_confirmation",
+            "single_open_position",
+            "high_low_path_tp_sl",
+            "conservative_same_candle_stop_first",
+            "round_trip_costs",
+        ],
+    }
+
+
+def _trade_path_return(
+    *,
+    close_prices: np.ndarray,
+    high_prices: np.ndarray,
+    low_prices: np.ndarray,
+    row_index: int,
+    target_n: int,
+    take_profit_pct: float,
+    stop_loss_pct: float,
+) -> tuple[float, int, str]:
+    current_price = close_prices[row_index]
+    future_closes = close_prices[row_index + 1 : row_index + target_n + 1]
+    future_highs = high_prices[row_index + 1 : row_index + target_n + 1]
+    future_lows = low_prices[row_index + 1 : row_index + target_n + 1]
+    if future_closes.size == 0:
+        return 0.0, 1, "time_exit"
+
+    for offset, (high, low) in enumerate(zip(future_highs, future_lows, strict=False), start=1):
+        take_hit = (high - current_price) / current_price >= take_profit_pct
+        stop_hit = (low - current_price) / current_price <= -stop_loss_pct
+        if stop_hit:
+            return -stop_loss_pct, offset, "stop_loss"
+        if take_hit:
+            return take_profit_pct, offset, "take_profit"
+
+    close_return = float((future_closes[-1] - current_price) / current_price)
+    return close_return, int(future_closes.size), "time_exit"
+
+
+def _walk_forward_validation(
+    *,
+    dataset: DatasetBundle,
+    parameters: dict,
+    probability_threshold: float,
+) -> dict:
+    holdout_start, _ = dataset.split_indices["holdout"]
+    folds_requested = int(parameters.get("walk_forward_folds", 3))
+    folds_requested = max(1, folds_requested)
+    embargo_rows = max(0, int(parameters.get("walk_forward_embargo_rows", parameters.get("target_n", 1))))
+    validation_size = max(1, holdout_start // (folds_requested + 1))
+    completed: list[dict] = []
+    skipped: list[dict] = []
+
+    for fold_number in range(1, folds_requested + 1):
+        validation_start = holdout_start - validation_size * (folds_requested - fold_number + 1)
+        validation_end = validation_start + validation_size
+        train_end = validation_start - embargo_rows
+        if validation_start <= 0 or validation_end > holdout_start:
+            skipped.append({"fold": fold_number, "reason": "insufficient_window"})
+            continue
+        if train_end <= 0:
+            skipped.append({"fold": fold_number, "reason": "embargo_removed_training_window"})
+            continue
+
+        y_train = dataset.labels[:train_end]
+        if len(set(y_train.tolist())) < 2:
+            skipped.append({"fold": fold_number, "reason": "single_class_training_labels"})
+            continue
+
+        positives = int(y_train.sum())
+        negatives = int(len(y_train) - positives)
+        try:
+            model = _fit_xgboost(
+                x_train=dataset.features[:train_end],
+                y_train=y_train,
+                x_validation=dataset.features[validation_start:validation_end],
+                y_validation=dataset.labels[validation_start:validation_end],
+                random_seed=int(parameters.get("global_random_seed", 42)) + fold_number,
+                xgboost_params=parameters.get("xgboost", {}),
+                scale_pos_weight=negatives / max(positives, 1),
+            )
+        except ValueError as exc:
+            skipped.append({"fold": fold_number, "reason": str(exc)})
+            continue
+
+        probabilities = model.predict_proba(dataset.features[validation_start:validation_end])[:, 1]
+        ml = _ml_metrics(dataset.labels[validation_start:validation_end], probabilities)
+        operational = _simulate_strategy_backtest(
+            dataset=dataset,
+            probabilities=probabilities,
+            start_index=validation_start,
+            probability_threshold=probability_threshold,
+            target_n=int(parameters.get("target_n", 1)),
+            take_profit_pct=float(parameters.get("take_profit_pct", 0.0)),
+            stop_loss_pct=float(parameters.get("stop_loss_pct", 0.0)),
+            entry_rsi_threshold=_entry_rsi_threshold(parameters),
+            fee_pct=_float_parameter(parameters, "fee_pct", 0.0),
+            slippage_pct=_float_parameter(parameters, "slippage_pct", 0.0),
+        )
+        completed.append(
+            {
+                "fold": fold_number,
+                "train_start_index": 0,
+                "train_end_index": train_end,
+                "embargo_rows": embargo_rows,
+                "validation_start_index": validation_start,
+                "validation_end_index": validation_end,
+                "ml_metrics": ml,
+                "operational_metrics": operational,
+            }
+        )
+
+    net_results = [fold["operational_metrics"]["net_result"] for fold in completed]
+    trade_counts = [fold["operational_metrics"]["simulated_trades"] for fold in completed]
+    precisions = [fold["ml_metrics"]["positive_precision"] for fold in completed]
+    return {
+        "requested_folds": folds_requested,
+        "embargo_rows": embargo_rows,
+        "completed_folds": len(completed),
+        "skipped_folds": skipped,
+        "folds": completed,
+        "aggregate": {
+            "total_simulated_trades": int(sum(trade_counts)),
+            "mean_net_result": float(np.mean(net_results)) if net_results else 0.0,
+            "profitable_folds": int(sum(result > 0 for result in net_results)),
+            "mean_positive_precision": float(np.mean(precisions)) if precisions else 0.0,
+        },
+    }
+
+
+def _entry_rsi_threshold(parameters: dict) -> float:
+    for key in ("entry_rsi_threshold", "rsi_oversold_threshold", "rsi_threshold"):
+        if key in parameters and parameters[key] is not None:
+            return float(parameters[key])
+    return 30.0
+
+
+def _float_parameter(parameters: dict, key: str, default: float) -> float:
+    value = parameters.get(key, default)
+    if value is None:
+        return default
+    return float(value)
+
+
+def _legacy_close_prices(future_returns: np.ndarray) -> np.ndarray:
+    prices = np.ones(len(future_returns) + 1, dtype=float)
+    for idx, future_return in enumerate(future_returns):
+        prices[idx + 1] = prices[idx] * (1 + future_return)
+    return prices

@@ -54,10 +54,6 @@ import { TrainingParameters, TrainingRequest } from '../models/strategy.model';
           <p-select formControlName="timeframe" [options]="timeframes" optionLabel="label" optionValue="value" />
         </label>
         <label>
-          Training Rows
-          <p-inputNumber formControlName="training_rows" [min]="180" [max]="100000" [showButtons]="true" />
-        </label>
-        <label>
           Target N
           <p-inputNumber formControlName="target_n" [min]="2" [max]="240" [showButtons]="true" />
         </label>
@@ -94,9 +90,13 @@ import { TrainingParameters, TrainingRequest } from '../models/strategy.model';
           <p-toggleswitch formControlName="auto_validate" />
         </div>
 
+        <p-message severity="info">
+          {{ calculatedWindowSummary() }}
+        </p-message>
+
         @if (showBinanceRetentionWarning()) {
           <p-message severity="warn">
-            Binance public sentiment data is limited to roughly 30 days. For M5, keep training rows near 8640 when sentiment is required.
+            Binance public sentiment data is limited to roughly 30 days. The backend keeps the raw candle request inside that window.
           </p-message>
         }
 
@@ -129,7 +129,6 @@ export class TrainingRequestDialogComponent {
     target_n: new FormControl(15, { nonNullable: true, validators: [Validators.min(2), Validators.max(240)] }),
     take_profit_percent: new FormControl(0.15, { nonNullable: true, validators: [Validators.min(0.0001), Validators.max(99.9999)] }),
     stop_loss_percent: new FormControl(0.1, { nonNullable: true, validators: [Validators.min(0.0001), Validators.max(99.9999)] }),
-    training_rows: new FormControl(8640, { nonNullable: true, validators: [Validators.min(180), Validators.max(100000)] }),
   });
 
   open(defaults: TrainingParameters): void {
@@ -144,7 +143,6 @@ export class TrainingRequestDialogComponent {
       target_n: defaults.target_n,
       take_profit_percent: this.toPercent(defaults.take_profit_pct),
       stop_loss_percent: this.toPercent(defaults.stop_loss_pct),
-      training_rows: Math.min(defaults.training_rows, 8640),
     });
     this.visible.set(true);
   }
@@ -165,14 +163,29 @@ export class TrainingRequestDialogComponent {
       target_n: value.target_n,
       take_profit_pct: this.fromPercent(value.take_profit_percent),
       stop_loss_pct: this.fromPercent(value.stop_loss_percent),
-      training_rows: value.training_rows,
     });
     this.visible.set(false);
   }
 
+  calculatedWindowSummary(): string {
+    const value = this.form.getRawValue();
+    const minutes = this.timeframeMinutes(value.timeframe);
+    if (!minutes) {
+      return 'Window will be calculated by the backend from the selected timeframe.';
+    }
+    const rawRows = Math.floor((30 * 24 * 60) / minutes);
+    const holdoutRows = Math.floor((72 * 60) / minutes);
+    const usableRows = rawRows - 80 - value.target_n;
+    const trainValidationRows = usableRows - holdoutRows;
+    if (trainValidationRows <= 0) {
+      return 'Selected timeframe is too coarse for the 30-day window and 72h holdout.';
+    }
+    return `Backend window: ${rawRows} raw candles, ${usableRows} usable rows, ${trainValidationRows} train/validation rows, ${holdoutRows} holdout rows.`;
+  }
+
   showBinanceRetentionWarning(): boolean {
     const value = this.form.getRawValue();
-    return value.exchange_id === 'binance' && value.sentiment_required && value.timeframe === 'M5' && value.training_rows > 8640;
+    return value.exchange_id === 'binance' && value.sentiment_required;
   }
 
   private toPercent(value: number): number {
@@ -181,5 +194,17 @@ export class TrainingRequestDialogComponent {
 
   private fromPercent(value: number): number {
     return Number((value / 100).toFixed(8));
+  }
+
+  private timeframeMinutes(timeframe: string): number | null {
+    const values: Record<string, number> = {
+      M5: 5,
+      M15: 15,
+      M30: 30,
+      H1: 60,
+      H4: 240,
+      D1: 1440,
+    };
+    return values[timeframe] ?? null;
   }
 }

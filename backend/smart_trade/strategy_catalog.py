@@ -3,6 +3,7 @@ from __future__ import annotations
 from smart_trade.application.ports.repositories import StrategyRepository
 from smart_trade.domain.entities import TrainingStrategy
 from smart_trade.domain.enums import StrategyStatus
+from smart_trade.domain.training_window import calculate_training_window
 from smart_trade.infrastructure.config import get_settings
 
 
@@ -11,6 +12,7 @@ STRATEGY_ID = "rsi_sentiment_xgboost_m1"
 
 def strategy_payload() -> dict:
     settings = get_settings()
+    default_window = calculate_training_window(settings.default_timeframe, settings.default_target_n)
     return {
         "id": STRATEGY_ID,
         "name": "RSI Sentiment XGBoost",
@@ -39,9 +41,11 @@ def strategy_payload() -> dict:
             "target_n": settings.default_target_n,
             "take_profit_pct": settings.default_take_profit_pct,
             "stop_loss_pct": settings.default_stop_loss_pct,
-            "training_rows": settings.default_training_rows,
+            "training_rows": default_window["usable_rows"],
             "validation_ratio": settings.default_validation_ratio,
-            "holdout_ratio": settings.default_holdout_ratio,
+            "holdout_ratio": default_window["holdout_ratio"],
+            "feature_warmup_rows": default_window["feature_warmup_rows"],
+            "training_window_policy": default_window,
             "probability_threshold": settings.default_probability_threshold,
             "xgboost": {
                 "max_depth": 3,
