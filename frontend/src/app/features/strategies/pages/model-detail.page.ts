@@ -11,7 +11,8 @@ import { EmptyStateComponent } from '../../../shared/ui/empty-state.component';
 import { LoadingStateComponent } from '../../../shared/ui/loading-state.component';
 import { StatusTagComponent } from '../../../shared/ui/status-tag.component';
 import { ModelScorecardComponent } from '../components/model-scorecard.component';
-import { TrainedModelDetail } from '../models/strategy.model';
+import { ValidationRequestDialogComponent } from '../components/validation-request-dialog.component';
+import { TrainedModelDetail, ValidationParameters } from '../models/strategy.model';
 
 @Component({
   selector: 'app-model-detail-page',
@@ -25,6 +26,7 @@ import { TrainedModelDetail } from '../models/strategy.model';
     ModelScorecardComponent,
     StatusTagComponent,
     TextareaModule,
+    ValidationRequestDialogComponent,
   ],
   template: `
     @if (loading()) {
@@ -39,7 +41,7 @@ import { TrainedModelDetail } from '../models/strategy.model';
         </div>
         <div class="button-row">
           <p-button icon="pi pi-arrow-left" label="Back" size="small" severity="secondary" (onClick)="back()" />
-          <p-button icon="pi pi-check-circle" label="Validate" size="small" [disabled]="model()!.status === 'APPROVED' || model()!.status === 'REJECTED' || validating()" (onClick)="validate()" />
+          <p-button icon="pi pi-check-circle" label="Validate" size="small" [disabled]="model()!.status === 'APPROVED' || model()!.status === 'REJECTED' || validating()" (onClick)="validationDialog.open(model()!)" />
           <p-button icon="pi pi-thumbs-up" label="Approve" size="small" severity="success" [disabled]="model()!.status !== 'VALIDATED'" (onClick)="approve()" />
           <p-button icon="pi pi-thumbs-down" label="Reject" size="small" severity="danger" [disabled]="model()!.status === 'APPROVED' || model()!.status === 'REJECTED'" (onClick)="rejectVisible.set(true)" />
           @if (model()!.status === 'REJECTED') {
@@ -59,6 +61,8 @@ import { TrainedModelDetail } from '../models/strategy.model';
       </section>
 
       <app-model-scorecard [model]="model()" />
+
+      <app-validation-request-dialog #validationDialog (submitted)="validate($event)" />
 
       <p-dialog header="Reject Model" [modal]="true" [visible]="rejectVisible()" (visibleChange)="rejectVisible.set($event)" [style]="{ width: '560px', maxWidth: '96vw' }">
         <label class="stacked-label">
@@ -102,13 +106,13 @@ export class ModelDetailPage {
     });
   }
 
-  validate(): void {
+  validate(request: ValidationParameters): void {
     const model = this.model();
     if (!model) {
       return;
     }
     this.validating.set(true);
-    this.api.validateModel(model.id).subscribe({
+    this.api.validateModel(model.id, request).subscribe({
       next: (updated) => {
         this.model.set(updated);
         this.validating.set(false);

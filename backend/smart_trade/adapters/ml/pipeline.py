@@ -33,12 +33,11 @@ def generate_dataset(
     *,
     rows: int,
     target_n: int,
-    take_profit_pct: float,
-    stop_loss_pct: float,
     validation_ratio: float,
     holdout_ratio: float,
     random_seed: int,
     feature_warmup_rows: int = 80,
+    rsi_oversold_threshold: float = 30.0,
 ) -> DatasetBundle:
     rng = np.random.default_rng(random_seed)
     returns = rng.normal(0.00002, 0.0018, rows + target_n + feature_warmup_rows)
@@ -78,23 +77,16 @@ def generate_dataset(
         ]
     )
 
-    labels = np.zeros(usable, dtype=int)
-    future_returns = np.zeros(usable)
-    for idx in range(usable):
-        current_price = price[start + idx]
-        future_path = price[start + idx + 1 : start + idx + target_n + 1]
-        rel = (future_path - current_price) / current_price
-        future_returns[idx] = rel[-1] if len(rel) else 0.0
-        gross_return, _, _ = _trade_path_return(
-            close_prices=price[start : start + usable + target_n],
-            high_prices=high[start : start + usable + target_n],
-            low_prices=low[start : start + usable + target_n],
-            row_index=idx,
-            target_n=target_n,
-            take_profit_pct=take_profit_pct,
-            stop_loss_pct=stop_loss_pct,
-        )
-        labels[idx] = int(gross_return >= take_profit_pct)
+    close_prices = price[start : start + usable + target_n]
+    high_prices = high[start : start + usable + target_n]
+    low_prices = low[start : start + usable + target_n]
+    labels, future_returns = _build_labels(
+        close_prices=close_prices,
+        usable=usable,
+        target_n=target_n,
+        rsi_values=rsi[start:end],
+        rsi_oversold_threshold=rsi_oversold_threshold,
+    )
 
     train_end = int(usable * (1 - validation_ratio - holdout_ratio))
     validation_end = int(usable * (1 - holdout_ratio))
@@ -118,14 +110,13 @@ def generate_dataset(
         },
         "dataset": {
             "mode": "synthetic",
+            "target_label_mode": "long_only_oversold_reversal_after_n_candles",
+            "rsi_oversold_threshold": float(rsi_oversold_threshold),
             "feature_warmup_rows": int(feature_warmup_rows),
             "requested_training_rows": int(rows),
             "usable_rows": int(usable),
         },
     }
-    close_prices = price[start : start + usable + target_n]
-    high_prices = high[start : start + usable + target_n]
-    low_prices = low[start : start + usable + target_n]
     return DatasetBundle(features, labels, future_returns, close_prices, high_prices, low_prices, split_indices, metadata)
 
 
@@ -137,12 +128,11 @@ def build_dataset_from_candles(
     timeframe: str,
     training_rows: int,
     target_n: int,
-    take_profit_pct: float,
-    stop_loss_pct: float,
     validation_ratio: float,
     holdout_ratio: float,
     sentiment_required: bool,
     sentiment: SentimentSeries | None = None,
+    rsi_oversold_threshold: float = 30.0,
 ) -> DatasetBundle:
     if sentiment_required and sentiment is None:
         raise ValidationError(
@@ -197,12 +187,10 @@ def build_dataset_from_candles(
     lows = frame["low"].iloc[start_index : start_index + usable + target_n].to_numpy(dtype=float)
     labels, future_returns = _build_labels(
         close_prices=prices,
-        high_prices=highs,
-        low_prices=lows,
         usable=usable,
         target_n=target_n,
-        take_profit_pct=take_profit_pct,
-        stop_loss_pct=stop_loss_pct,
+        rsi_values=feature_frame["rsi_14"].iloc[start_index : start_index + usable].to_numpy(dtype=float),
+        rsi_oversold_threshold=rsi_oversold_threshold,
     )
     split_indices = _split_indices(usable, validation_ratio, holdout_ratio)
     if split_indices["train"][1] <= split_indices["train"][0]:
@@ -219,6 +207,8 @@ def build_dataset_from_candles(
             "sentiment_required": sentiment_required,
             "sentiment_status": sentiment_status,
             "sentiment_metadata": sentiment_metadata,
+            "target_label_mode": "long_only_oversold_reversal_after_n_candles",
+            "rsi_oversold_threshold": float(rsi_oversold_threshold),
             "raw_candle_count": len(candles),
             "requested_training_rows": int(training_rows),
             "usable_rows": int(usable),
@@ -333,6 +323,7 @@ def validate_model(
     target_n = int(parameters.get("target_n", 1))
     take_profit_pct = float(parameters.get("take_profit_pct", 0.0))
     stop_loss_pct = float(parameters.get("stop_loss_pct", 0.0))
+    trailing_parameters = _trailing_parameters(parameters, stop_loss_pct)
     operational = _simulate_strategy_backtest(
         dataset=dataset,
         probabilities=probabilities,
@@ -341,9 +332,28 @@ def validate_model(
         target_n=target_n,
         take_profit_pct=take_profit_pct,
         stop_loss_pct=stop_loss_pct,
+        trailing_stop_enabled=trailing_parameters["enabled"],
+        trailing_activation_pct=trailing_parameters["activation_pct"],
+        trailing_distance_pct=trailing_parameters["distance_pct"],
         entry_rsi_threshold=_entry_rsi_threshold(parameters),
         fee_pct=_float_parameter(parameters, "fee_pct", 0.0),
         slippage_pct=_float_parameter(parameters, "slippage_pct", 0.0),
+    )
+    threshold_analysis = _threshold_analysis(
+        dataset=dataset,
+        probabilities=probabilities,
+        start_index=holdout_start,
+        configured_probability_threshold=probability_threshold,
+        target_n=target_n,
+        take_profit_pct=take_profit_pct,
+        stop_loss_pct=stop_loss_pct,
+        trailing_stop_enabled=trailing_parameters["enabled"],
+        trailing_activation_pct=trailing_parameters["activation_pct"],
+        trailing_distance_pct=trailing_parameters["distance_pct"],
+        entry_rsi_threshold=_entry_rsi_threshold(parameters),
+        fee_pct=_float_parameter(parameters, "fee_pct", 0.0),
+        slippage_pct=_float_parameter(parameters, "slippage_pct", 0.0),
+        min_trades=int(parameters.get("threshold_min_trades", 10)),
     )
     walk_forward = _walk_forward_validation(
         dataset=dataset,
@@ -358,6 +368,7 @@ def validate_model(
             "holdout_end_index": holdout_end,
             "holdout_rows": int(len(x_holdout)),
             "walk_forward": walk_forward,
+            "threshold_analysis": threshold_analysis,
         },
     }
 
@@ -416,12 +427,10 @@ def _load_price_array(data, key: str) -> np.ndarray:
 def _build_labels(
     *,
     close_prices: np.ndarray,
-    high_prices: np.ndarray,
-    low_prices: np.ndarray,
     usable: int,
     target_n: int,
-    take_profit_pct: float,
-    stop_loss_pct: float,
+    rsi_values: np.ndarray,
+    rsi_oversold_threshold: float,
 ) -> tuple[np.ndarray, np.ndarray]:
     labels = np.zeros(usable, dtype=int)
     future_returns = np.zeros(usable)
@@ -430,16 +439,7 @@ def _build_labels(
         path = close_prices[idx + 1 : idx + target_n + 1]
         rel = (path - current_price) / current_price
         future_returns[idx] = rel[-1] if len(rel) else 0.0
-        gross_return, _, _ = _trade_path_return(
-            close_prices=close_prices,
-            high_prices=high_prices,
-            low_prices=low_prices,
-            row_index=idx,
-            target_n=target_n,
-            take_profit_pct=take_profit_pct,
-            stop_loss_pct=stop_loss_pct,
-        )
-        labels[idx] = int(gross_return >= take_profit_pct)
+        labels[idx] = int(rsi_values[idx] <= rsi_oversold_threshold and future_returns[idx] > 0)
     return labels, future_returns
 
 
@@ -525,12 +525,15 @@ def _simulate_strategy_backtest(
     target_n: int,
     take_profit_pct: float,
     stop_loss_pct: float,
+    trailing_stop_enabled: bool,
+    trailing_activation_pct: float,
+    trailing_distance_pct: float,
     entry_rsi_threshold: float,
     fee_pct: float,
     slippage_pct: float,
 ) -> dict:
     trades: list[float] = []
-    exit_reasons: dict[str, int] = {"take_profit": 0, "stop_loss": 0, "time_exit": 0}
+    exit_reasons: dict[str, int] = {"take_profit": 0, "stop_loss": 0, "trailing_stop": 0, "time_exit": 0}
     blocked_by_position = 0
     entry_candidates = 0
     model_signals = 0
@@ -559,6 +562,9 @@ def _simulate_strategy_backtest(
             target_n=target_n,
             take_profit_pct=take_profit_pct,
             stop_loss_pct=stop_loss_pct,
+            trailing_stop_enabled=trailing_stop_enabled,
+            trailing_activation_pct=trailing_activation_pct,
+            trailing_distance_pct=trailing_distance_pct,
         )
         trades.append(gross_return - (2 * fee_pct) - (2 * slippage_pct))
         exit_reasons[exit_reason] += 1
@@ -586,6 +592,9 @@ def _simulate_strategy_backtest(
         "exit_reasons": exit_reasons,
         "probability_threshold": probability_threshold,
         "entry_rsi_threshold": entry_rsi_threshold,
+        "trailing_stop_enabled": trailing_stop_enabled,
+        "trailing_activation_pct": trailing_activation_pct,
+        "trailing_distance_pct": trailing_distance_pct,
         "fee_pct": fee_pct,
         "slippage_pct": slippage_pct,
         "backtest_rules": [
@@ -594,10 +603,93 @@ def _simulate_strategy_backtest(
             "model_confirmation",
             "single_open_position",
             "high_low_path_tp_sl",
+            "trailing_stop_after_favorable_move",
             "conservative_same_candle_stop_first",
             "round_trip_costs",
         ],
     }
+
+
+def _threshold_analysis(
+    *,
+    dataset: DatasetBundle,
+    probabilities: np.ndarray,
+    start_index: int,
+    configured_probability_threshold: float,
+    target_n: int,
+    take_profit_pct: float,
+    stop_loss_pct: float,
+    trailing_stop_enabled: bool,
+    trailing_activation_pct: float,
+    trailing_distance_pct: float,
+    entry_rsi_threshold: float,
+    fee_pct: float,
+    slippage_pct: float,
+    min_trades: int,
+) -> dict:
+    rows = []
+    for threshold in _threshold_grid(configured_probability_threshold):
+        metrics = _simulate_strategy_backtest(
+            dataset=dataset,
+            probabilities=probabilities,
+            start_index=start_index,
+            probability_threshold=threshold,
+            target_n=target_n,
+            take_profit_pct=take_profit_pct,
+            stop_loss_pct=stop_loss_pct,
+            trailing_stop_enabled=trailing_stop_enabled,
+            trailing_activation_pct=trailing_activation_pct,
+            trailing_distance_pct=trailing_distance_pct,
+            entry_rsi_threshold=entry_rsi_threshold,
+            fee_pct=fee_pct,
+            slippage_pct=slippage_pct,
+        )
+        rows.append(
+            {
+                "probability_threshold": threshold,
+                "signals_generated": metrics["signals_generated"],
+                "entry_candidates": metrics["entry_candidates"],
+                "simulated_trades": metrics["simulated_trades"],
+                "net_result": metrics["net_result"],
+                "expectancy_per_trade": metrics["expectancy_per_trade"],
+                "profit_factor": metrics["profit_factor"],
+                "max_drawdown": metrics["max_drawdown"],
+                "win_rate": metrics["win_rate"],
+                "largest_loss_streak": metrics["largest_loss_streak"],
+            }
+        )
+    recommended = _recommend_threshold(rows, min_trades)
+    return {
+        "thresholds": rows,
+        "configured_probability_threshold": configured_probability_threshold,
+        "recommended_probability_threshold": recommended["probability_threshold"] if recommended else None,
+        "minimum_trades": min_trades,
+        "selection_rule": "highest_profit_factor_then_net_result_with_minimum_trades_and_positive_expectancy",
+    }
+
+
+def _threshold_grid(configured_probability_threshold: float) -> list[float]:
+    thresholds = {0.50, 0.55, 0.60, 0.65, 0.70, 0.75, round(configured_probability_threshold, 4)}
+    return sorted(thresholds)
+
+
+def _recommend_threshold(rows: list[dict], min_trades: int) -> dict | None:
+    eligible = [
+        row
+        for row in rows
+        if row["simulated_trades"] >= min_trades
+        and row["net_result"] > 0
+        and row["expectancy_per_trade"] > 0
+    ]
+    if not eligible:
+        return None
+
+    def sort_key(row: dict) -> tuple[float, float, int]:
+        profit_factor = row["profit_factor"]
+        comparable_profit_factor = float("inf") if profit_factor is None else float(profit_factor)
+        return comparable_profit_factor, float(row["net_result"]), int(row["simulated_trades"])
+
+    return max(eligible, key=sort_key)
 
 
 def _trade_path_return(
@@ -609,8 +701,16 @@ def _trade_path_return(
     target_n: int,
     take_profit_pct: float,
     stop_loss_pct: float,
+    trailing_stop_enabled: bool = False,
+    trailing_activation_pct: float = 0.0,
+    trailing_distance_pct: float = 0.0,
 ) -> tuple[float, int, str]:
     current_price = close_prices[row_index]
+    initial_stop_price = current_price * (1 - stop_loss_pct)
+    stop_price = initial_stop_price
+    take_profit_price = current_price * (1 + take_profit_pct)
+    activation_price = current_price * (1 + trailing_activation_pct)
+    trailing_activated = False
     future_closes = close_prices[row_index + 1 : row_index + target_n + 1]
     future_highs = high_prices[row_index + 1 : row_index + target_n + 1]
     future_lows = low_prices[row_index + 1 : row_index + target_n + 1]
@@ -618,12 +718,16 @@ def _trade_path_return(
         return 0.0, 1, "time_exit"
 
     for offset, (high, low) in enumerate(zip(future_highs, future_lows, strict=False), start=1):
-        take_hit = (high - current_price) / current_price >= take_profit_pct
-        stop_hit = (low - current_price) / current_price <= -stop_loss_pct
-        if stop_hit:
-            return -stop_loss_pct, offset, "stop_loss"
+        if low <= stop_price:
+            exit_return = float((stop_price - current_price) / current_price)
+            exit_reason = "trailing_stop" if trailing_activated and stop_price > initial_stop_price else "stop_loss"
+            return exit_return, offset, exit_reason
+        take_hit = high >= take_profit_price
         if take_hit:
             return take_profit_pct, offset, "take_profit"
+        if trailing_stop_enabled and high >= activation_price:
+            trailing_activated = True
+            stop_price = max(stop_price, high * (1 - trailing_distance_pct))
 
     close_return = float((future_closes[-1] - current_price) / current_price)
     return close_return, int(future_closes.size), "time_exit"
@@ -677,6 +781,7 @@ def _walk_forward_validation(
 
         probabilities = model.predict_proba(dataset.features[validation_start:validation_end])[:, 1]
         ml = _ml_metrics(dataset.labels[validation_start:validation_end], probabilities)
+        trailing_parameters = _trailing_parameters(parameters, float(parameters.get("stop_loss_pct", 0.0)))
         operational = _simulate_strategy_backtest(
             dataset=dataset,
             probabilities=probabilities,
@@ -685,6 +790,9 @@ def _walk_forward_validation(
             target_n=int(parameters.get("target_n", 1)),
             take_profit_pct=float(parameters.get("take_profit_pct", 0.0)),
             stop_loss_pct=float(parameters.get("stop_loss_pct", 0.0)),
+            trailing_stop_enabled=trailing_parameters["enabled"],
+            trailing_activation_pct=trailing_parameters["activation_pct"],
+            trailing_distance_pct=trailing_parameters["distance_pct"],
             entry_rsi_threshold=_entry_rsi_threshold(parameters),
             fee_pct=_float_parameter(parameters, "fee_pct", 0.0),
             slippage_pct=_float_parameter(parameters, "slippage_pct", 0.0),
@@ -732,6 +840,19 @@ def _float_parameter(parameters: dict, key: str, default: float) -> float:
     if value is None:
         return default
     return float(value)
+
+
+def _trailing_parameters(parameters: dict, default_stop_loss_pct: float) -> dict:
+    enabled = bool(parameters.get("trailing_stop_enabled", True))
+    activation = _float_parameter(parameters, "trailing_activation_pct", default_stop_loss_pct)
+    distance = _float_parameter(parameters, "trailing_distance_pct", default_stop_loss_pct)
+    if not enabled:
+        return {"enabled": False, "activation_pct": activation, "distance_pct": distance}
+    if activation <= 0:
+        raise ValidationError("trailing_activation_pct must be greater than zero when trailing stop is enabled")
+    if distance <= 0:
+        raise ValidationError("trailing_distance_pct must be greater than zero when trailing stop is enabled")
+    return {"enabled": True, "activation_pct": activation, "distance_pct": distance}
 
 
 def _legacy_close_prices(future_returns: np.ndarray) -> np.ndarray:

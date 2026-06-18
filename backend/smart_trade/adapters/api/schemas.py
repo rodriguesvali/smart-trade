@@ -33,24 +33,39 @@ class TrainingRequest(BaseModel):
     sentiment_symbol: str | None = None
     timeframe: str | None = None
     target_n: int | None = Field(default=None, ge=2, le=240)
-    take_profit_pct: float | None = Field(
-        default=None,
-        gt=0,
-        lt=1,
-        description="Decimal fraction target. Example: 0.01 means 1%, 0.001 means 0.1%.",
-    )
-    stop_loss_pct: float | None = Field(
-        default=None,
-        gt=0,
-        lt=1,
-        description="Decimal fraction target. Example: 0.01 means 1%, 0.001 means 0.1%.",
-    )
+    rsi_oversold_threshold: float | None = Field(default=None, ge=0, le=100)
+    xgboost: dict[str, float | int] | None = None
     training_rows: int | None = Field(
         default=None,
         ge=180,
         le=100_000,
         description="Deprecated override. The backend calculates usable rows from timeframe using a 30-day raw window and 72h holdout.",
     )
+
+
+class ValidationRequest(BaseModel):
+    probability_threshold: float | None = Field(default=None, gt=0, lt=1)
+    rsi_oversold_threshold: float | None = Field(default=None, ge=0, le=100)
+    take_profit_pct: float | None = Field(
+        default=None,
+        gt=0,
+        lt=1,
+        description="Decimal fraction target used only by validation/backtest execution.",
+    )
+    stop_loss_pct: float | None = Field(
+        default=None,
+        gt=0,
+        lt=1,
+        description="Decimal fraction stop used only by validation/backtest execution.",
+    )
+    trailing_stop_enabled: bool | None = None
+    trailing_activation_pct: float | None = Field(default=None, gt=0, lt=1)
+    trailing_distance_pct: float | None = Field(default=None, gt=0, lt=1)
+    fee_pct: float | None = Field(default=None, ge=0, lt=1)
+    slippage_pct: float | None = Field(default=None, ge=0, lt=1)
+    threshold_min_trades: int | None = Field(default=None, ge=1, le=10_000)
+    walk_forward_folds: int | None = Field(default=None, ge=1, le=20)
+    walk_forward_embargo_rows: int | None = Field(default=None, ge=0, le=10_000)
 
 
 class TrainingRunRead(BaseModel):

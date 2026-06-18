@@ -4,7 +4,6 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { interval, Subscription, switchMap, takeWhile } from 'rxjs';
 import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
-import { TableModule } from 'primeng/table';
 
 import { SmartTradeApiClient } from '../../../core/api/smart-trade-api.client';
 import { EmptyStateComponent } from '../../../shared/ui/empty-state.component';
@@ -30,7 +29,6 @@ import {
     LoadingStateComponent,
     MetricTileComponent,
     StatusTagComponent,
-    TableModule,
     TrainedModelsTableComponent,
     TrainingRequestDialogComponent,
     TrainingRunProgressComponent,
@@ -70,26 +68,6 @@ import {
       </section>
 
       <app-training-run-progress [run]="activeRun()" />
-
-      <section class="surface-section">
-        <div class="section-title">
-          <h3>Default Parameters</h3>
-        </div>
-        <p-table [value]="parameterRows()" styleClass="p-datatable-sm">
-          <ng-template pTemplate="header">
-            <tr>
-              <th>Parameter</th>
-              <th>Value</th>
-            </tr>
-          </ng-template>
-          <ng-template pTemplate="body" let-row>
-            <tr>
-              <td class="mono">{{ row.key }}</td>
-              <td>{{ row.value }}</td>
-            </tr>
-          </ng-template>
-        </p-table>
-      </section>
 
       <section class="surface-section">
         <div class="section-title">
@@ -136,13 +114,6 @@ export class StrategyDetailPage {
       },
       error: () => this.loading.set(false),
     });
-  }
-
-  parameterRows(): { key: string; value: string }[] {
-    const params = this.strategy()?.default_parameters ?? {};
-    return Object.entries(params)
-      .filter(([, value]) => typeof value !== 'object')
-      .map(([key, value]) => ({ key, value: String(value) }));
   }
 
   startTraining(request: TrainingRequest): void {

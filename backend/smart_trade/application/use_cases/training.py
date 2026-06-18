@@ -183,7 +183,7 @@ class TrainingUseCases:
             {"run_id": run.id, "model_id": model.id, "artifact_path": model.artifact_path},
         )
 
-    def validate_model(self, model_id: str) -> TrainedModel:
+    def validate_model(self, model_id: str, validation_overrides: dict | None = None) -> TrainedModel:
         model = self.get_model(model_id)
         run = self.get_run(model.run_id)
         model.start_validation(self.clock.now())
@@ -191,7 +191,9 @@ class TrainingUseCases:
         self._audit("VALIDATION_STARTED", "Model validation started", {"model_id": model.id})
 
         try:
-            output = self.validator.validate(artifact_path=model.artifact_path, parameters=run.requested_parameters)
+            validation_parameters = _resolve_validation_parameters(run.requested_parameters, validation_overrides or {})
+            _validate_validation_parameters(validation_parameters)
+            output = self.validator.validate(artifact_path=model.artifact_path, parameters=validation_parameters)
             result = ValidationResult(
                 id=self.ids.new_id(),
                 model_id=model.id,
@@ -204,7 +206,11 @@ class TrainingUseCases:
             self.validations.save(result)
             model.complete_validation(self.clock.now(), result)
             self.models.save(model)
-            self._audit("VALIDATION_COMPLETED", "Model validation completed", {"model_id": model.id})
+            self._audit(
+                "VALIDATION_COMPLETED",
+                "Model validation completed",
+                {"model_id": model.id, "validation_overrides": validation_overrides or {}},
+            )
             return self.get_model(model.id)
         except Exception as exc:
             failed = self.get_model(model_id)
@@ -307,7 +313,9 @@ class TrainingUseCases:
 
 
 def _validate_training_parameters(parameters: dict) -> None:
-    for key in ("take_profit_pct", "stop_loss_pct"):
+    for key in ("take_profit_pct", "stop_loss_pct", "trailing_activation_pct", "trailing_distance_pct"):
+        if key not in parameters or parameters[key] is None:
+            continue
         value = float(parameters[key])
         if value <= 0:
             raise ValidationError(f"{key} must be greater than zero")
@@ -319,6 +327,44 @@ def _validate_training_parameters(parameters: dict) -> None:
         raise ValidationError("validation_ratio must be greater than zero")
     if float(parameters["validation_ratio"]) + float(parameters["holdout_ratio"]) >= 1:
         raise ValidationError("validation_ratio plus holdout_ratio must leave a non-empty training partition")
+
+
+def _validate_validation_parameters(parameters: dict) -> None:
+    for key in ("take_profit_pct", "stop_loss_pct", "trailing_activation_pct", "trailing_distance_pct"):
+        if key not in parameters or parameters[key] is None:
+            continue
+        value = float(parameters[key])
+        if value <= 0:
+            raise ValidationError(f"{key} must be greater than zero")
+        if value >= 1:
+            raise ValidationError(
+                f"{key} must be a decimal fraction, not a whole percent. Use 0.01 for 1%, 0.001 for 0.1%."
+            )
+    for key in ("fee_pct", "slippage_pct"):
+        if key in parameters and parameters[key] is not None and float(parameters[key]) < 0:
+            raise ValidationError(f"{key} cannot be negative")
+    if "rsi_oversold_threshold" in parameters and parameters["rsi_oversold_threshold"] is not None:
+        value = float(parameters["rsi_oversold_threshold"])
+        if value < 0 or value > 100:
+            raise ValidationError("rsi_oversold_threshold must be between 0 and 100")
+
+
+def _resolve_validation_parameters(training_parameters: dict, validation_overrides: dict) -> dict:
+    resolved = dict(training_parameters)
+    defaults = training_parameters.get("validation", {})
+    if isinstance(defaults, dict):
+        resolved.update({key: value for key, value in defaults.items() if value is not None})
+    resolved["entry_rsi_threshold"] = resolved.get(
+        "entry_rsi_threshold",
+        resolved.get("rsi_oversold_threshold", 30.0),
+    )
+    for key, value in validation_overrides.items():
+        if value is None:
+            continue
+        resolved[key] = value
+        if key == "rsi_oversold_threshold":
+            resolved["entry_rsi_threshold"] = value
+    return resolved
 
 
 def _resolve_training_window_parameters(parameters: dict) -> dict:

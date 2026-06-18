@@ -21,14 +21,13 @@ export interface TrainingParameters {
   sentiment_symbol?: string;
   timeframe: string;
   target_n: number;
-  take_profit_pct: number;
-  stop_loss_pct: number;
+  rsi_oversold_threshold?: number;
   training_rows: number;
   validation_ratio: number;
   holdout_ratio: number;
   feature_warmup_rows?: number;
   training_window_policy?: Record<string, unknown>;
-  probability_threshold: number;
+  validation?: ValidationParameters;
   xgboost?: Record<string, number>;
 }
 
@@ -41,8 +40,23 @@ export interface TrainingRequest {
   sentiment_symbol?: string;
   timeframe?: string;
   target_n?: number;
+  rsi_oversold_threshold?: number;
+  xgboost?: Record<string, number>;
+}
+
+export interface ValidationParameters {
+  probability_threshold?: number;
+  rsi_oversold_threshold?: number;
   take_profit_pct?: number;
   stop_loss_pct?: number;
+  trailing_stop_enabled?: boolean;
+  trailing_activation_pct?: number;
+  trailing_distance_pct?: number;
+  fee_pct?: number;
+  slippage_pct?: number;
+  threshold_min_trades?: number;
+  walk_forward_folds?: number;
+  walk_forward_embargo_rows?: number;
 }
 
 export interface TrainingRunRead {
@@ -89,6 +103,7 @@ export interface TrainedModelDetail extends TrainedModelSummary {
 
 export interface ValidationSummary {
   latest_validation_result_id: string;
+  window_metadata?: Record<string, unknown>;
   ml_metrics: Record<string, unknown>;
   operational_metrics: Record<string, unknown>;
 }

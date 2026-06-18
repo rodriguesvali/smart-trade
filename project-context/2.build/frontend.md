@@ -37,12 +37,20 @@ Primeira versão do frontend Angular + PrimeNG implementada para o MVP do pipeli
   - `DELETE /api/models/{model_id}`;
   - `GET /api/audit-events`.
 - Tela de estratégias com tabela e ação `Open`.
-- Tela de detalhe da estratégia com retorno para lista, parâmetros default, modelos treinados e início de treinamento.
+- Tela de detalhe da estratégia com retorno para lista, resumo operacional, modelos treinados e início de treinamento.
+- A tabela de parâmetros default foi removida da tela de detalhe da estratégia; os valores são revisados no diálogo de treinamento antes da confirmação.
 - Dialog de treinamento com Reactive Forms, validações básicas e aviso de retenção pública da Binance.
 - Campo manual `Training Rows` removido do diálogo; a UI agora informa a janela calculada pelo backend a partir do timeframe, usando 30 dias brutos, warmup de 80 candles, `target_n` e holdout final de 72h.
-- Campos `Take Profit` e `Stop Loss` exibidos em percentual para o usuário e convertidos para fração decimal no payload do backend.
+- Dialog de treinamento organizado em abas específicas para contexto/dataset, target e XGBoost.
+- Aba XGBoost do treinamento expõe `max_depth`, `learning_rate`, `n_estimators`, `subsample` e `colsample_bytree`, enviando os valores confirmados ao backend.
+- Campos do diálogo de treinamento exibem ícone `pi-info-circle` ao lado do label com tooltip contextual detalhado, incluindo uso, defaults e limites quando aplicável.
 - Polling de execução assíncrona via `GET /api/training-runs/{run_id}`.
 - Tela de detalhe do modelo com scorecard de métricas, validação, aprovação, rejeição com comentário e exclusão de modelo `REJECTED` após confirmação.
+- Botão `Validate` abre um diálogo próprio de validação com threshold de confiança, IFR sobrevendido, TP, SL, trailing, custos, mínimo de trades e walk-forward.
+- Campos do diálogo de validação exibem ícone `pi-info-circle` com tooltip detalhado, incluindo uso, defaults e limites quando aplicável.
+- Quando `Trailing Stop` está desligado no diálogo de validação, `Trailing Activation` e `Trailing Distance` ficam desativados e não são enviados no payload.
+- Scorecard do modelo exibe análise de threshold de confiança com recomendação e tabela operacional por threshold.
+- Scorecard do modelo exibe evidência operacional adicional para decisão de aprovação: setup da validação, funil de execução, razões de saída e resumo/tabela de walk-forward.
 - Tela de eventos de auditoria com payload JSON expandível.
 - CORS habilitado no backend para `http://localhost:4200` e `http://127.0.0.1:4200`.
 - Tasks/launch do VS Code atualizados para frontend, browser, Swagger e compound full stack.
@@ -72,8 +80,10 @@ Decisões:
 - Comunicação HTTP centralizada em `SmartTradeApiClient`.
 - Features isolam modelos, páginas e componentes próprios.
 - O frontend trata `VALIDATED` como evidência técnica, não como aprovação operacional.
-- O formulário de treinamento apresenta percentuais de forma amigável, mas preserva o contrato backend `take_profit_pct`/`stop_loss_pct` como frações decimais.
+- O formulário de treinamento não envia parâmetros operacionais de backtest; TP, SL, trailing, custos e threshold pertencem ao formulário de validação.
+- O formulário de validação apresenta percentuais de forma amigável, mas preserva o contrato backend como frações decimais.
 - O formulário de treinamento não envia mais `training_rows`; esse valor é calculado e auditado no backend em `requested_parameters.training_window_policy`.
+- Os hiperparâmetros XGBoost são confirmados no diálogo de treinamento, não na tela de detalhe da estratégia.
 
 ## Documentação Consultada
 
@@ -85,12 +95,19 @@ Decisões:
   - `Router.navigate()`;
   - lazy-loaded routes;
   - Reactive Forms.
+  - control flow de template `@if`/`@for` e uso de `track` em templates standalone.
+  - Reactive Forms com `FormGroup`, `FormControl`, validadores e submissão em componente standalone.
+  - limpeza de imports standalone não usados após remoção de template.
 - PrimeNG MCP:
   - instalação/setup standalone;
   - `confirmdialog` slots disponíveis;
   - data components: `table`, `paginator`, `timeline`;
   - form components: `inputtext`, `inputnumber`, `select`, `toggleswitch`, `textarea`;
   - overlay components: `dialog`, `confirmdialog`, `tooltip`.
+  - `TableModule` / `p-table` para tabelas pequenas de evidência operacional.
+  - `Dialog`, `InputNumber` e `ToggleSwitch` para formulário modal de validação operacional.
+  - `Tabs` / `TabsModule` para organizar o diálogo de treinamento em abas.
+  - `Tooltip` / `TooltipModule` para ajuda contextual acionada por ícone ao lado do label.
 - PrimeNG v20/v21 theming via Context7:
   - `providePrimeNG`;
   - Aura preset;
@@ -125,8 +142,8 @@ No VS Code:
 ## Evidência de Verificação
 
 - `cd frontend && npm run build`: passou.
-  - Observação: warning de budget inicial do Angular, bundle inicial `671.25 kB` contra budget default `500 kB`, causado pela combinação Angular + PrimeNG. Não bloqueia o MVP.
-- `cd backend && .venv/bin/python -m pytest -q tests`: 8 passed.
+  - Observação: warning de budget inicial do Angular, bundle inicial `673.11 kB` contra budget default `500 kB`, causado pela combinação Angular + PrimeNG. Não bloqueia o MVP.
+- `cd backend && .venv/bin/python -m pytest -q tests`: 14 passed.
 - `.vscode/tasks.json` e `.vscode/launch.json` válidos via `python -m json.tool`.
 - Smoke HTTP:
   - `curl -I http://localhost:4200/`: `200 OK`;

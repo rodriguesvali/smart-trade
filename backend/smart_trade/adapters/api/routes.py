@@ -25,6 +25,7 @@ from smart_trade.adapters.api.schemas import (
     TrainedModelSummary,
     TrainingRequest,
     TrainingRunRead,
+    ValidationRequest,
     ValidationResultRead,
 )
 
@@ -74,8 +75,8 @@ def create_training_run(
                     "sentiment_symbol": request.sentiment_symbol,
                     "timeframe": request.timeframe,
                     "target_n": request.target_n,
-                    "take_profit_pct": request.take_profit_pct,
-                    "stop_loss_pct": request.stop_loss_pct,
+                    "rsi_oversold_threshold": request.rsi_oversold_threshold,
+                    "xgboost": request.xgboost,
                     "training_rows": request.training_rows,
                 },
             )
@@ -115,10 +116,12 @@ def get_model(model_id: str, use_cases: TrainingUseCases = Depends(get_use_cases
 @router.post("/models/{model_id}/validate", response_model=TrainedModelDetail, tags=["validation"])
 def validate_trained_model(
     model_id: str,
+    request: ValidationRequest | None = None,
     use_cases: TrainingUseCases = Depends(get_use_cases),
 ) -> TrainedModelDetail:
     try:
-        return _model_detail(use_cases.validate_model(model_id))
+        overrides = request.model_dump(exclude_none=True) if request is not None else {}
+        return _model_detail(use_cases.validate_model(model_id, validation_overrides=overrides))
     except DomainError as exc:
         raise _http_error(exc) from exc
 

@@ -20,8 +20,6 @@ def test_real_dataset_builder_uses_requested_training_rows() -> None:
         timeframe="M5",
         training_rows=180,
         target_n=8,
-        take_profit_pct=0.001,
-        stop_loss_pct=0.001,
         validation_ratio=0.2,
         holdout_ratio=0.2,
         sentiment_required=False,
@@ -31,6 +29,7 @@ def test_real_dataset_builder_uses_requested_training_rows() -> None:
     assert dataset.labels.shape == (180,)
     assert dataset.feature_metadata["dataset"]["mode"] == "real"
     assert dataset.feature_metadata["dataset"]["sentiment_status"] == "ohlcv_proxy_features"
+    assert dataset.feature_metadata["dataset"]["target_label_mode"] == "long_only_oversold_reversal_after_n_candles"
     assert dataset.feature_metadata["feature_names"] == [
         "rsi_14",
         "open_interest_roc",
@@ -49,8 +48,6 @@ def test_real_dataset_builder_fails_when_sentiment_is_required() -> None:
             timeframe="M5",
             training_rows=180,
             target_n=8,
-            take_profit_pct=0.001,
-            stop_loss_pct=0.001,
             validation_ratio=0.2,
             holdout_ratio=0.2,
             sentiment_required=True,
@@ -79,8 +76,6 @@ def test_real_dataset_builder_uses_real_sentiment_when_available() -> None:
         timeframe="M5",
         training_rows=180,
         target_n=8,
-        take_profit_pct=0.001,
-        stop_loss_pct=0.001,
         validation_ratio=0.2,
         holdout_ratio=0.2,
         sentiment_required=True,

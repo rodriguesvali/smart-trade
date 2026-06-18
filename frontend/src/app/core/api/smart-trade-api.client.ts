@@ -14,6 +14,7 @@ import {
   TrainedModelSummary,
   TrainingRequest,
   TrainingRunRead,
+  ValidationParameters,
 } from '../../features/strategies/models/strategy.model';
 
 @Injectable({ providedIn: 'root' })
@@ -49,8 +50,8 @@ export class SmartTradeApiClient {
     return this.http.get<TrainedModelDetail>(`${this.baseUrl}/api/models/${modelId}`);
   }
 
-  validateModel(modelId: string): Observable<TrainedModelDetail> {
-    return this.http.post<TrainedModelDetail>(`${this.baseUrl}/api/models/${modelId}/validate`, {});
+  validateModel(modelId: string, request: ValidationParameters = {}): Observable<TrainedModelDetail> {
+    return this.http.post<TrainedModelDetail>(`${this.baseUrl}/api/models/${modelId}/validate`, request);
   }
 
   approveModel(modelId: string, request: ApprovalRequest): Observable<TrainedModelDetail> {

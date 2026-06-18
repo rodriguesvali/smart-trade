@@ -3,13 +3,16 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError as PydanticValidationError
+
 os.environ["SMART_TRADE_DATA_MODE"] = "synthetic"
 os.environ["SMART_TRADE_DATABASE_URL"] = "sqlite:///./var/test_smart_trade.db"
 os.environ["SMART_TRADE_ARTIFACT_DIR"] = "./var/test-models"
 
 from fastapi.testclient import TestClient
 
-from smart_trade.adapters.api.schemas import TrainingRequest
+from smart_trade.adapters.api.schemas import TrainingRequest, ValidationRequest
 from smart_trade.domain.training_window import calculate_training_window
 from smart_trade_api.main import app
 from smart_trade_training_worker.main import run_once
@@ -61,13 +64,29 @@ def test_training_and_validation_flow() -> None:
         assert model_response.status_code == 200
         assert model_response.json()["status"] == "TRAINED"
 
-        validation_response = client.post(f"/api/models/{model_id}/validate")
+        validation_response = client.post(
+            f"/api/models/{model_id}/validate",
+            json={
+                "probability_threshold": 0.7,
+                "rsi_oversold_threshold": 35.0,
+                "take_profit_pct": 0.001,
+                "stop_loss_pct": 0.001,
+                "trailing_stop_enabled": True,
+                "trailing_activation_pct": 0.001,
+                "trailing_distance_pct": 0.001,
+            },
+        )
         assert validation_response.status_code == 200
         validated_model = validation_response.json()
         assert validated_model["status"] == "VALIDATED"
         assert validated_model["validation_summary"]["ml_metrics"]["row_count"] > 0
         assert "entry_candidates" in validated_model["validation_summary"]["operational_metrics"]
+        assert validated_model["validation_summary"]["operational_metrics"]["probability_threshold"] == 0.7
+        assert validated_model["validation_summary"]["operational_metrics"]["entry_rsi_threshold"] == 35.0
         assert "walk_forward" in validated_model["validation_summary"]["window_metadata"]
+        threshold_analysis = validated_model["validation_summary"]["window_metadata"]["threshold_analysis"]
+        assert threshold_analysis["configured_probability_threshold"] == 0.7
+        assert 0.75 in {row["probability_threshold"] for row in threshold_analysis["thresholds"]}
         artifact_path = Path(validated_model["artifact_path"])
         dataset_path = artifact_path.with_suffix(".dataset.npz")
         assert artifact_path.exists()
@@ -115,23 +134,9 @@ def test_training_and_validation_flow() -> None:
         assert any(event["event_type"] == "MODEL_DELETED" for event in events.json())
 
 
-def test_training_rejects_whole_number_percentages() -> None:
-    with TestClient(app) as client:
-        strategy_id = client.get("/api/strategies").json()[0]["id"]
-
-        response = client.post(
-            f"/api/strategies/{strategy_id}/training-runs",
-            json={
-                "timeframe": "M5",
-                "training_rows": 180,
-                "target_n": 2,
-                "take_profit_pct": 1,
-                "stop_loss_pct": 1,
-            },
-        )
-
-        assert response.status_code == 422
-        assert "Input should be less than 1" in response.text
+def test_validation_rejects_whole_number_percentages() -> None:
+    with pytest.raises(PydanticValidationError):
+        ValidationRequest(take_profit_pct=1, stop_loss_pct=1)
 
 
 def test_training_request_accepts_deprecated_training_rows_override() -> None:

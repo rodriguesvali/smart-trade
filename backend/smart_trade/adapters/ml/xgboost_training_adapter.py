@@ -31,12 +31,11 @@ class SyntheticXGBoostTrainingAdapter:
         dataset = generate_dataset(
             rows=int(parameters["training_rows"]),
             target_n=int(parameters["target_n"]),
-            take_profit_pct=float(parameters["take_profit_pct"]),
-            stop_loss_pct=float(parameters["stop_loss_pct"]),
             validation_ratio=float(parameters["validation_ratio"]),
             holdout_ratio=float(parameters["holdout_ratio"]),
             random_seed=int(parameters.get("global_random_seed", self.random_seed)),
             feature_warmup_rows=int(parameters.get("feature_warmup_rows", 80)),
+            rsi_oversold_threshold=float(parameters.get("rsi_oversold_threshold", parameters.get("entry_rsi_threshold", 30.0))),
         )
         artifact_path = self.artifact_dir / f"{model_id}.json"
         dataset_path = self.artifact_dir / f"{model_id}.dataset.npz"
@@ -53,8 +52,9 @@ class SyntheticXGBoostTrainingAdapter:
             feature_schema=dataset.feature_metadata,
             target_parameters={
                 "target_n": parameters["target_n"],
-                "take_profit_pct": parameters["take_profit_pct"],
-                "stop_loss_pct": parameters["stop_loss_pct"],
+                "target_label_mode": "long_only_oversold_reversal_after_n_candles",
+                "rsi_oversold_threshold": parameters.get("rsi_oversold_threshold", parameters.get("entry_rsi_threshold", 30.0)),
+                "target_return_threshold": 0.0,
             },
             training_metrics=training_metrics,
         )
@@ -122,12 +122,11 @@ class RealXGBoostTrainingAdapter:
             timeframe=timeframe,
             training_rows=rows,
             target_n=target_n,
-            take_profit_pct=float(parameters["take_profit_pct"]),
-            stop_loss_pct=float(parameters["stop_loss_pct"]),
             validation_ratio=float(parameters["validation_ratio"]),
             holdout_ratio=float(parameters["holdout_ratio"]),
             sentiment_required=sentiment_required,
             sentiment=sentiment,
+            rsi_oversold_threshold=float(parameters.get("rsi_oversold_threshold", parameters.get("entry_rsi_threshold", 30.0))),
         )
         artifact_path = self.artifact_dir / f"{model_id}.json"
         dataset_path = self.artifact_dir / f"{model_id}.dataset.npz"
@@ -144,8 +143,9 @@ class RealXGBoostTrainingAdapter:
             feature_schema=dataset.feature_metadata,
             target_parameters={
                 "target_n": parameters["target_n"],
-                "take_profit_pct": parameters["take_profit_pct"],
-                "stop_loss_pct": parameters["stop_loss_pct"],
+                "target_label_mode": "long_only_oversold_reversal_after_n_candles",
+                "rsi_oversold_threshold": parameters.get("rsi_oversold_threshold", parameters.get("entry_rsi_threshold", 30.0)),
+                "target_return_threshold": 0.0,
             },
             training_metrics=training_metrics,
         )
